@@ -3,8 +3,8 @@
 library(raster)
 library(gstat)
 library(spdep)
-resolution <- '10m'
-#resolution <- '5m'
+#resolution <- '10m'
+resolution <- '5m'
 if(resolution == '10m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/NEON 10m/terrain characteristics'
 } else if(resolution == '5m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/5m terrain characteristics'}
 modelResults <- 'C:/Users/smdevine/Desktop/post doc/czo work/model_results'
@@ -43,7 +43,7 @@ if(resolution == '10m') {
 } else if(resolution == '5m') {
     NEON_terrain$solrad_5m <- NEON_terrain$solrad_5m / 1000
     names(NEON_terrain)
-    names(NEON_terrain) <- c('aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'EVI_2017_N', 'EVI_2018_N', 'IMI_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'solrad_N')
+    names(NEON_terrain) <- c('aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_N', 'EVI_2017_N', 'EVI_2018_N', 'IMI_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'solrad_N', 'stream_dist_N')
   }
 NEON_terrain$TPI_N <- terrain(NEON_terrain$elev_N, opt = 'TPI', neighbors = 8)
 NEON_terrain$TRI_N <- terrain(NEON_terrain$elev_N, opt = 'TRI', neighbors = 8)
@@ -63,6 +63,7 @@ soaproot_pts_terrain$ndvi2012_2015avg <- apply(soaproot_pts_terrain[,which(colna
 #soaproot_pts_terrain$DSD_M <- extract(DSD, soaproot_pts_WGS84) / 10 #because DSD is in units 10 * mm yr^-1; buffer=15, fun=mean improves variance explained only slightly with old estimates of DSD but slope still 1.05
 #soaproot_pts_terrain$TPI_USGS <- extract(USGS_TPI, soaproot_pts_usgs_dem)
 soaproot_pts_terrain$DSD_v2_M <- extract(DSD_v2, soaproot_pts_WGS84) / 10 #latest file from 4/9/19 cropped to previous version extent
+#soaproot_pts_terrain$elev_above_str_N <- extract(raster(file.path(NEONterrainDir, 'elev_above_str_150.tif')), soaproot_UTM11N_shp)
 df_master <- read.csv(file.path(dataDir, 'Master Data Set_with rock outcrop.csv'), stringsAsFactors = FALSE) #removed biological data from this dataset but it has duplicate rows where multiple biological observations were made at each point; also removed 0's from outcrop (OC) site codes 01-09 to match points dataset labeling
 #head(df_master)
 #tapply(df_master$Depth, df_master$Site, summary)
@@ -189,11 +190,15 @@ soaproot_pts_analysis$Landscape.indicator <- soaproot_pts_original$Landscape.ind
 colnames(soaproot_pts_analysis)
 hist(soaproot_pts_analysis$Depth)
 hist(soaproot_pts_analysis$Depth_log)
-
+hist(soaproot_pts_analysis$elev_above_str_N)
+summary(soaproot_pts_analysis$elev_above_str_N[soaproot_pts_analysis$Depth < 7.56])
+summary(soaproot_pts_analysis$elev_above_str_N[soaproot_pts_analysis$Depth > 7.56])
+soaproot_pts_analysis$Site[soaproot_pts_analysis$elev_above_str_N > 30]
+soaproot_pts_analysis[,c('Site', 'elev_above_str_N')]
 mapply(function(x,y,z='Depth') 
   {lm_result <- lm(soaproot_pts_analysis[[z]] ~ x)
   plot(x, soaproot_pts_analysis[[z]], main=paste(y, 'r2 = ', round(summary(lm_result)$r.squared, 2)))
-  abline(lm_result, lty=2)}, x=soaproot_pts_analysis[,2:37], y=colnames(soaproot_pts_analysis)[2:37])
+  abline(lm_result, lty=2)}, x=soaproot_pts_analysis[,2:32], y=colnames(soaproot_pts_analysis)[2:32])
 
 #look at time-series of NDVIs (landsat) by point
 soaproot_pts_analysis$Site[soaproot_pts_analysis$ndvi2006_2009avg < 0.2]
@@ -423,15 +428,16 @@ crossval_lm <- function(df_pts, varname, model='~ curv_prof_N + DSD_M + NDVI_201
   print(summary(lm(df_pts[[varname]] ~ predictions)))
   list(rmse.kfold=rmse, oob.predictions=predictions)
 }
-
-#orgC_0_30_rmse_lm <- crossval_lm(soaproot_pts_analysis, 'Depth', model =)
+#test <- crossval_lm(soaproot_pts_analysis, 'Depth_log', model ='~slope_N')
+#test$rmse.kfold
+#mean(test$rmse.kfold)
 
 #MLR model selection
 colnames(soaproot_pts_analysis)
 subset1 <- expand.grid(elev_N=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE), ndvi2012_2015avg=c(TRUE, FALSE))
-subset2 <- expand.grid(stream_dist_N_200=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE))
-subset3 <- expand.grid(stream_dist_N_200=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), curv_mean_N=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE), SEI_N=c(TRUE, FALSE))
-subset4 <- expand.grid(stream_dist_N_200=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), TPI_N=c(TRUE, FALSE), solrad_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE))
+subset2 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE))
+subset3 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), curv_mean_N=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE), SEI_N=c(TRUE, FALSE))
+subset4 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), TPI_N=c(TRUE, FALSE), solrad_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE))
 subset5 <- expand.grid(CTI_N=c(TRUE, FALSE), curv_prof_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), SEI_N=c(TRUE, FALSE), ndvi2012_2015avg=c(TRUE, FALSE))
 # df <- soaproot_pts_analysis
 # depth <- 'gamma_syn'
@@ -460,14 +466,14 @@ model_selection_MLR <- function(df, varname, depth, varDir1, varDir2, n, model_d
     print(mean(model_selection_results[[i]]$rmse.kfold))
   }
   mean_RMSEs <- unlist(lapply(model_selection_results, function(x) mean(x$rmse.kfold))) #mean cross-validated RMSE by n tested models
-  mean_RMSEs_all <- cbind(1:length(unique(kf)), do.call(cbind, lapply(model_selection_results, function(x) x$rmse.kfold))) #mean RMSE for each k-fold iteration of n tested models
+  mean_RMSEs_all <- cbind(as.data.frame(1:length(unique(kf))), do.call(cbind, lapply(model_selection_results, function(x) x$rmse.kfold))) #mean RMSE for each k-fold iteration of n tested models; cbind when one at least column is a data.frame returns a data.frame
   colnames(mean_RMSEs_all) <- c('kfold', paste0('model_', 1:nrow(models_to_test)))
-  oob_predictions_all <- cbind(df$Site, do.call(cbind, lapply(model_selection_results, function(x) x$oob.predictions)))
-  colnames(oob_predictions_all) <- c('Site', paste0('model_', 1:nrow(models_to_test)))
+  oob_predictions_all <- cbind(df['Site'], do.call(cbind, lapply(model_selection_results, function(x) x$oob.predictions)))
+  colnames(oob_predictions_all)[2:ncol(oob_predictions_all)] <- paste0('model_', 1:nrow(models_to_test))
   #make summary
   df_model <- apply(models_to_test, 1, sum)
-  meanRMSEs <- apply(mean_RMSEs_all, 2, mean)
-  oob_r2s <- apply(oob_predictions_all, 2, function(x) summary(lm(df[[varname]] ~ x))$r.squared)
+  meanRMSEs <- apply(mean_RMSEs_all[,2:ncol(mean_RMSEs_all)], 2, mean)
+  oob_r2s <- apply(oob_predictions_all[,2:ncol(oob_predictions_all)], 2, function(x) summary(lm(df[[varname]] ~ x))$r.squared)
   summary <- data.frame(model=apply(models_to_test, 1, function(x) paste(colnames(models_to_test)[x], collapse = ' + ')), meanRMSE=meanRMSEs, oob_r.squared=oob_r2s, df_model=df_model)
   summary_by_model_df <- split(summary, summary$df_model)
   best_models <- unlist(lapply(summary_by_model_df, function(x) as.character(x$model[which.min(x$meanRMSE)])))
@@ -484,7 +490,8 @@ model_selection_MLR <- function(df, varname, depth, varDir1, varDir2, n, model_d
 #model_selection_no_OC <- model_selection_MLR(df=soaproot_pts_analysis_no_OC, depth = 'No_OC', varname = 'Depth', varDir = 'Depth', n=40)
 
 #run different versions of depths > 7.56 m
-run_analysis <- function(version_no, varDir1) {
+run_analysis <- function(version_no, varDir1, var_subset) {
+  varDir2 <- paste0('gamma_syn_great7.5m_', version_no)
   soaproot_pts_analysis$Depth[soaproot_pts_analysis$Depth > 7.56] <- 7.56
   for(i in 1:length(soaproot_pts_analysis$Depth)) {
     if(soaproot_pts_analysis$Depth[i] == 7.56) {
@@ -493,18 +500,22 @@ run_analysis <- function(version_no, varDir1) {
   }
   #hist(soaproot_pts_analysis$Depth)
   soaproot_pts_analysis$Depth_log <- log(soaproot_pts_analysis$Depth) 
-  result <- model_selection_MLR(df=soaproot_pts_analysis, depth = 'gamma_syn', varname = 'Depth_log', varDir1 = varDir1, varDir2 = paste0('gamma_syn_great7.5m_', version_no), n=66, model_df = 1:5)
+  result <- model_selection_MLR(df=soaproot_pts_analysis, depth = 'gamma_syn', varname = 'Depth_log', varDir1 = varDir1, varDir2 = varDir2, n=66, model_df = 1:5, var_subset = var_subset)
   write.csv(soaproot_pts_analysis[,c('Site', 'Depth')], file.path(modelResults, 'MLR_model_selection', varDir1, varDir2, paste0('soaproot_pts_syndepths_', version_no, '.csv')), row.names = FALSE)
   result
 }
 #run_analysis(version_no = 'v1', varDir1 = 'subset_1')
-finalize_analysis <- function(runs) { #runs is a vector how many times we want to repeat the assignment of random depths > 7.56 with MLR testing (eg. 1:30 would be 30 times)
+finalize_analysis <- function(runs, varDir1, var_subset) { #runs is a vector how many times we want to repeat the assignment of random depths > 7.56 with MLR testing (eg. 1:30 would be 30 times)
   overall_summary <- do.call(cbind, lapply(paste0('v', runs), function(x) {
-    run_analysis(x, varDir1 = 'subset_1')
+    run_analysis(x, varDir1 = varDir1, var_subset = var_subset)
     }))
-  write.csv(overall_summary, file.path(modelResults, varDir1, 'best_models_summary.csv'), row.names = FALSE)
+  write.csv(overall_summary, file.path(modelResults, 'MLR_model_selection', varDir1, 'best_models_summary.csv'), row.names = FALSE)
 }
-finalize_analysis(1:2)
+finalize_analysis(runs=1:30, varDir1='subset_1', var_subset = subset1)
+finalize_analysis(runs=1:30, varDir1='subset_2', var_subset = subset2)
+finalize_analysis(runs=1:30, varDir1='subset_3', var_subset = subset3)
+finalize_analysis(runs=1:30, varDir1='subset_4', var_subset = subset4)
+finalize_analysis(runs=1:30, varDir1='subset_5', var_subset = subset5)
 #best 2-var model for v1 trial
 summary(lm(Depth_log ~ EVI_2017_N + stream_dist_N_150, data=soaproot_pts_analysis)) #r2=0.36
 vif(lm(Depth_log ~ EVI_2017_N + stream_dist_N_150, data=soaproot_pts_analysis))
