@@ -111,17 +111,20 @@ QA_master <- do.call(cbind, QA_summaries)
 write.csv(QA_master, file.path(summaryDir, 'finals', 'QA_2013_2017_final.csv'), row.names = TRUE)
 #these QA values all mean clear: 322, 386, 834, 898, 1346, according to LSDS-1368_ L8_Surface-Reflectance-Code-LASRC-Product-Guide.pdf
 QA_indices <- lapply(QA_master, function(x) {
-  sum(x!=322) #thus a zero means that all points were under clear sky, the meaning of 322 
+  sum(!(x%in%c(322, 386, 834, 898, 1346))) #thus a zero means that all points were under clear sky and snow/ice-free based on QA codes 
   #y <- as.numeric(paste0(unique(x), collapse = ''))
   #print(y)
   })
+QA_indices
 dim(NDVI_master) #100 109
 NDVI_master <- NDVI_master[ ,which(QA_indices==0)]
-dim(NDVI_master) #100  59
+dim(NDVI_master) #100  61 [got two more columns]
 write.csv(NDVI_master, file.path(summaryDir, 'finals', 'NDVI_2013_2017_final.csv'), row.names = TRUE)
 
 dim(EVI_master)
 EVI_master <- EVI_master[ ,which(QA_indices==0)]
 dim(EVI_master)
 write.csv(EVI_master, file.path(summaryDir, 'finals', 'EVI_2013_2017_final.csv'), row.names = TRUE)
+
+#merge with depth
 
