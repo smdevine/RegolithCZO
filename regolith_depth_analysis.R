@@ -3,14 +3,15 @@
 library(raster)
 library(gstat)
 library(spdep)
-#resolution <- '10m'
-resolution <- '5m'
+resolution <- '10m'
+#resolution <- '5m'
 if(resolution == '10m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/NEON 10m/terrain characteristics'
 } else if(resolution == '5m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/5m terrain characteristics'}
 modelResults <- 'C:/Users/smdevine/Desktop/post doc/czo work/model_results'
 RyanGeospatialDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/RYAN GEOSPATIAL'
 DSDdir <- 'C:/Users/smdevine/Desktop/post doc/czo work/DSD Mike'
 dataDir <- 'C:/Users/smdevine/Desktop/post doc/czo work'
+landsat8Dir <- 'C:/Users/smdevine/Desktop/post doc/czo work/landsat8/summaries/finals'
 list.files(dataDir)
 soaproot_pts <- read.csv(file.path(dataDir, 'Soaproot points RF.csv'), stringsAsFactors = FALSE)
 #CRS("+init=epsg:4326") #this is geographic coordinates using WGS84 datum
@@ -39,7 +40,7 @@ NEON_terrain <- stack(list.files(NEONterrainDir, full.names = TRUE))
 if(resolution == '10m') {
   NEON_terrain$annsolrad_10m <- NEON_terrain$annsolrad_10m / 1000
   names(NEON_terrain)
-  names(NEON_terrain) <- c('solrad_N', 'aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'EVI_2017_N', 'EVI_2018_N', 'flowacc_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'stream_dist_N_100', 'stream_dist_N_150', 'stream_dist_N_200', 'stream_dist_N_300', 'stream_dist_N_400', 'TCI_N')
+  names(NEON_terrain) <- c('solrad_N', 'aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_150', 'EVI_2017_N', 'EVI_2018_N', 'flowacc_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'stream_dist_N_100', 'stream_dist_N_150', 'stream_dist_N_200', 'stream_dist_N_300', 'stream_dist_N_400', 'TCI_N')
 } else if(resolution == '5m') {
     NEON_terrain$solrad_5m <- NEON_terrain$solrad_5m / 1000
     names(NEON_terrain)
@@ -89,10 +90,61 @@ soaproot_pts_terrain$Depth <- df_sites$Depth[match(soaproot_pts_terrain$Site, df
 #plot(soaproot_pts_terrain$DSD_v2_M, soaproot_pts_terrain$DSD_M)
 summary(soaproot_pts_terrain$Depth)
 soaproot_pts_terrain$Depth[is.na(soaproot_pts_terrain$Depth) & grepl('OC', soaproot_pts_terrain$Site)] <- 0
-soaproot_pts_original <- merge(soaproot_pts_terrain, df_sites, by='Site')
+soaproot_pts_original <- merge(soaproot_pts_terrain, df_sites, by='Site') #67 augered; 13 OCs hand-picked by Ryan
 #dim(soaproot_pts_original)
 #soaproot_pts_original <- soaproot_pts_original[!soaproot_pts_original$Depth.x==0,]
 #write.csv(soaproot_pts_terrain, file.path(dataDir, 'fit data distribution', 'soaproot_pts100_terrain.csv'), row.names = FALSE)
+
+#inspect time Landsat 8 time series for all 100 points, symbolizing by regolith depth
+#doy_20160121_ndvi is wonky
+include_OC <- FALSE
+NDVI_landsat8 <- read.csv(file.path(landsat8Dir, 'NDVI_2013_2017_final.csv'), row.names = 1)
+NDVI_landsat8$doy_20160121_ndvi <- NULL
+NDVI_landsat8$Site <- row.names(NDVI_landsat8)
+NDVI_landsat8$Depth <- soaproot_pts_terrain$Depth[match(NDVI_landsat8$Site, soaproot_pts_terrain$Site)] #they are both in same order but this is safer nonetheless
+NDVI_landsat8 <- NDVI_landsat8[!is.na(NDVI_landsat8$Depth), ]
+if (include_OC) {} else {
+  NDVI_landsat8 <- NDVI_landsat8[NDVI_landsat8$Depth!=0,]
+}
+dim(NDVI_landsat8)   
+dates_raw <- colnames(NDVI_landsat8)[1:(ncol(NDVI_landsat8)-2)]
+dates <- sapply(strsplit(dates_raw, ''), function(x) paste0(x[5:12], collapse=''))
+dates <- as.Date(dates, '%Y%m%d')
+colnames(NDVI_landsat8)
+date1 <- '20130418'
+date2 <- '20160715'
+indice1 <- which(colnames(NDVI_landsat8)==paste0('doy_', date1, '_ndvi'))
+indice2 <- which(colnames(NDVI_landsat8)==paste0('doy_', date2, '_ndvi'))
+  
+NDVI_landsat8$Depth_color <- ifelse(NDVI_landsat8$Depth==7.56, 'red3', ifelse(NDVI_landsat8$Depth>3, 'orange2', ifelse(NDVI_landsat8$Depth>0, 'grey', ifelse(NDVI_landsat8$Depth==0, 'white', 'pink'))))
+NDVI_landsat8$Depth_color
+for (i in seq_along(NDVI_landsat8$Depth)) {
+  if (i == 1) {
+    plot(dates[indice1:indice2], NDVI_landsat8[i,indice1:indice2], type='l', col=NDVI_landsat8$Depth_color[i], ylim=c(0.3, 0.8), xaxt='n', xlab='', yaxt = 'n', ylab = 'NDVI')
+  } else {lines(dates[indice1:indice2], NDVI_landsat8[i,indice1:indice2], col=NDVI_landsat8$Depth_color[i])}
+}
+axis.Date(side = 1, at=seq.Date(from = as.Date(date1, '%Y%m%d'), to = as.Date(date2, '%Y%m%d'), by='months'), format = '%m/%d/%y')
+
+#do the same with EVI
+include_OC <- FALSE
+EVI_landsat8 <- read.csv(file.path(landsat8Dir, 'EVI_2013_2017_final.csv'), row.names = 1)
+EVI_landsat8$Site <- row.names(EVI_landsat8)
+EVI_landsat8$Depth <- soaproot_pts_terrain$Depth[match(EVI_landsat8$Site, soaproot_pts_terrain$Site)] #they are both in same order but this is safer nonetheless
+EVI_landsat8 <- EVI_landsat8[!is.na(EVI_landsat8$Depth), ]
+if (include_OC) {} else {
+  EVI_landsat8 <- EVI_landsat8[EVI_landsat8$Depth!=0,]
+}
+dates_raw <- colnames(EVI_landsat8)[1:(ncol(EVI_landsat8)-2)]
+dates <- sapply(strsplit(dates_raw, ''), function(x) paste0(x[5:12], collapse=''))
+dates <- as.Date(dates, '%Y%m%d')
+EVI_landsat8$Depth_color <- ifelse(EVI_landsat8$Depth==7.56, 'darkred', ifelse(EVI_landsat8$Depth>3, 'orange4', ifelse(EVI_landsat8$Depth>0, 'yellow4', ifelse(EVI_landsat8$Depth==0, 'white', 'pink'))))
+for (i in seq_along(EVI_landsat8$Depth)) {
+  if (i == 1) {
+    plot(dates, EVI_landsat8[i,1:which(colnames(EVI_landsat8)=='doy_20171225_evi')], type='l', col=EVI_landsat8$Depth_color[i], ylim=c(0, 0.6), xaxt='n', xlab='', yaxt = 'n', ylab = 'EVI', xlim = as.Date(c('2013-04-15', '2017-12-30')))
+  } else {lines(dates, EVI_landsat8[i,1:which(colnames(EVI_landsat8)=='doy_20171225_evi')], col=EVI_landsat8$Depth_color[i])}
+}
+axis.Date(side = 1, at=seq.Date(from = as.Date('2013-04-15'), to = as.Date('2017-12-30'), by='months'), format = '%m/%d/%y')
+
 
 #original model verification (n=80(67 auger; 13 rock outcrop), 67 all auguer, and 40 all auger and depth determinable)
 library(car)
@@ -195,12 +247,66 @@ summary(soaproot_pts_analysis$elev_above_str_N[soaproot_pts_analysis$Depth < 7.5
 summary(soaproot_pts_analysis$elev_above_str_N[soaproot_pts_analysis$Depth > 7.56])
 soaproot_pts_analysis$Site[soaproot_pts_analysis$elev_above_str_N > 30]
 soaproot_pts_analysis[,c('Site', 'elev_above_str_N')]
-mapply(function(x,y,z='Depth') 
+mapply(function(x,y,z='Depth_log') 
   {lm_result <- lm(soaproot_pts_analysis[[z]] ~ x)
   plot(x, soaproot_pts_analysis[[z]], main=paste(y, 'r2 = ', round(summary(lm_result)$r.squared, 2)))
   abline(lm_result, lty=2)}, x=soaproot_pts_analysis[,2:32], y=colnames(soaproot_pts_analysis)[2:32])
 
-#look at time-series of NDVIs (landsat) by point
+#do the same for the landsat8 spectral indices time-series
+NDVI_landsat8$Depth[NDVI_landsat8$Depth > 7.56] <- 7.56
+NDVI_landsat8$Depth
+for(i in 1:length(NDVI_landsat8$Depth)) {
+  if(NDVI_landsat8$Depth[i] == 7.56) {
+    NDVI_landsat8$Depth[i] <- synthetic_7.56m_gamma(shape = 1.915, scale=1/0.273) #when no OCs are included for lognorm: meanlog=1.840, sdlog=0.878; when four OCs with depth =0.01 are included: meanlog=1.705, sdlog=1.123; see excel file
+  } else {next}
+}
+hist(NDVI_landsat8$Depth)
+NDVI_landsat8$Depth_log <- log(NDVI_landsat8$Depth) 
+mapply(function(x,y,z='Depth') 
+{lm_result <- lm(NDVI_landsat8[[z]] ~ x)
+plot(x, NDVI_landsat8[[z]], main=paste(y, 'r2 = ', round(summary(lm_result)$r.squared, 2)))
+abline(lm_result, lty=2)}, x=NDVI_landsat8[,1:which(colnames(NDVI_landsat8)=='doy_20171225_ndvi')], y=colnames(NDVI_landsat8)[1:which(colnames(NDVI_landsat8)=='doy_20171225_ndvi')])
+
+#check a 2014 Apr-Oct mean vs. Depth
+hist(apply(NDVI_landsat8[,which(colnames(NDVI_landsat8)=='doy_20140523_ndvi'):which(colnames(NDVI_landsat8)=='doy_20141030_ndvi')], 1, mean))
+summary(lm(NDVI_landsat8$Depth_log ~ apply(NDVI_landsat8[,which(colnames(NDVI_landsat8)=='doy_20140523_ndvi'):which(colnames(NDVI_landsat8)=='doy_20141030_ndvi')], 1, mean)))
+
+#check a 2015 Apr-Oct mean vs. Depth
+colnames(NDVI_landsat8)
+hist(apply(NDVI_landsat8[,which(colnames(NDVI_landsat8)=='doy_20150510_ndvi'):which(colnames(NDVI_landsat8)=='doy_20151118_ndvi')], 1, mean))
+summary(lm(NDVI_landsat8$Depth_log ~ apply(NDVI_landsat8[,which(colnames(NDVI_landsat8)=='doy_20150510_ndvi'):which(colnames(NDVI_landsat8)=='doy_20151118_ndvi')], 1, mean)))
+#check 2015 - 2014 
+delta2015_2014 <- apply(NDVI_landsat8[,which(colnames(NDVI_landsat8)=='doy_20140216_ndvi'):which(colnames(NDVI_landsat8)=='doy_20141030_ndvi')], 1, mean) - apply(NDVI_landsat8[,which(colnames(NDVI_landsat8)=='doy_20150118_ndvi'):which(colnames(NDVI_landsat8)=='doy_20151118_ndvi')], 1, mean)
+delta2016_2013 <- apply(NDVI_landsat8[,which(colnames(NDVI_landsat8)=='doy_20130418_ndvi'):which(colnames(NDVI_landsat8)=='doy_20131027_ndvi')], 1, mean) - apply(NDVI_landsat8[,which(colnames(NDVI_landsat8)=='doy_20160426_ndvi'):which(colnames(NDVI_landsat8)=='doy_20161019_ndvi')], 1, mean)
+summary(lm(NDVI_landsat8$Depth_log ~ delta2016_2013))
+plot(delta2016_2013, NDVI_landsat8$Depth_log)
+plot(delta2016_2013, NDVI_landsat8$Depth)
+
+#EVI time series
+EVI_landsat8$Depth[EVI_landsat8$Depth > 7.56] <- 7.56
+EVI_landsat8$Depth
+for(i in 1:length(EVI_landsat8$Depth)) {
+  if(EVI_landsat8$Depth[i] == 7.56) {
+    EVI_landsat8$Depth[i] <- synthetic_7.56m_gamma(shape = 1.915, scale=1/0.273) #when no OCs are included for lognorm: meanlog=1.840, sdlog=0.878; when four OCs with depth =0.01 are included: meanlog=1.705, sdlog=1.123; see excel file
+  } else {next}
+}
+hist(EVI_landsat8$Depth)
+EVI_landsat8$Depth_log <- log(EVI_landsat8$Depth) 
+mapply(function(x,y,z='Depth_log') 
+{lm_result <- lm(EVI_landsat8[[z]] ~ x)
+plot(x, EVI_landsat8[[z]], main=paste(y, 'r2 = ', round(summary(lm_result)$r.squared, 2)))
+abline(lm_result, lty=2)}, x=EVI_landsat8[,1:which(colnames(EVI_landsat8)=='doy_20171225_evi')], y=colnames(EVI_landsat8)[1:which(colnames(EVI_landsat8)=='doy_20171225_evi')])
+
+#check a 2014 mean vs. Depth
+hist(apply(EVI_landsat8[,which(colnames(EVI_landsat8)=='doy_20140216_evi'):which(colnames(EVI_landsat8)=='doy_20141030_evi')], 1, mean))
+summary(lm(EVI_landsat8$Depth_log ~ apply(EVI_landsat8[,which(colnames(EVI_landsat8)=='doy_20140216_evi'):which(colnames(EVI_landsat8)=='doy_20141030_evi')], 1, mean)))
+#check a 2015 mean vs. Depth
+hist(apply(EVI_landsat8[,which(colnames(EVI_landsat8)=='doy_20140216_evi'):which(colnames(EVI_landsat8)=='doy_20150118_evi')], 1, mean))
+summary(lm(EVI_landsat8$Depth_log ~ apply(EVI_landsat8[,which(colnames(EVI_landsat8)=='doy_20150118_evi'):which(colnames(EVI_landsat8)=='doy_20151118_evi')], 1, mean)))
+
+
+
+#look at time-series of NDVIs (landsat Sept from Ryan) by point
 soaproot_pts_analysis$Site[soaproot_pts_analysis$ndvi2006_2009avg < 0.2]
 lapply(soaproot_pts_analysis[,which(colnames(soaproot_pts_analysis)=='ndvi2006'):which(colnames(soaproot_pts_analysis)=='ndvi2015')], summary)
 for (i in 1:66) {
