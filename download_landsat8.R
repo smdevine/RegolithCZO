@@ -16,9 +16,11 @@ test <- espa_products(data_source$product_id)
 test$master #1's indicate availability
 dim(test$master)
 test$master$sr_ndvi
+grepl('T1', test$master$product_id)
 
-# placing an espa order
-result_order <- espa_order(input_ids = data_source$product_id, product = c("sr_ndvi", "sr_evi"), projection = "lonlat", order_note = "Soaproot cover 2018") #including source data "sr" and "toa" requires too much memory
+
+# placing an espa order [cannot order RT 'real-time' scenes from 2018]
+result_order <- espa_order(input_ids = data_source$product_id[grepl('T1', test$master$product_id)], product = c("sr_ndvi", "sr_evi"), projection = "lonlat", order_note = "Soaproot cover 2018") #including source data "sr" and "toa" requires too much memory
 order_id <- result_order$order_details$orderid
 #for 2016 order: "espa-smdevine@ucdavis.edu-04302019-125550-891"
 #for 2017 order: "espa-smdevine@ucdavis.edu-04302019-131936-862"
