@@ -49,6 +49,8 @@ if(resolution == '10m') {
 NEON_terrain$TPI_N <- terrain(NEON_terrain$elev_N, opt = 'TPI', neighbors = 8)
 NEON_terrain$TRI_N <- terrain(NEON_terrain$elev_N, opt = 'TRI', neighbors = 8)
 #USGS_TPI <- terrain(dem_USGS, opt = 'TPI', neighbors = 8)
+NEON_terrain$curv_mean_filt <- raster(file.path(dataDir, 'NEON 10m', 'terrain chars filtered', 'curv_mean.tif'))
+NEON_terrain$curv_mean_filt_true <- raster(file.path(dataDir, 'NEON 10m', 'terrain chars filtered', 'curv_mean_filtered.tif'))
 soaproot_pts_terrain <- extract(NEON_terrain, soaproot_UTM11N_shp, df=TRUE)
 #colnames(soaproot_pts_terrain)
 soaproot_pts_terrain$ID <- NULL
@@ -209,6 +211,16 @@ synthetic_7.56m_gamma <- function(shape, scale) {
 #soaproot_pts_analysis <- soaproot_pts_analysis[soaproot_pts_analysis$Depth < 7.56,]
 soaproot_pts_analysis <- soaproot_pts_terrain[grepl('SR.A.', soaproot_pts_terrain$Site), ] #leaves out all rock outcrop points
 soaproot_pts_analysis <- soaproot_pts_analysis[!is.na(soaproot_pts_analysis$Depth),] #one point had a NA for depth
+
+#compare mean curvatures
+plot(soaproot_pts_analysis$curv_mean_N, soaproot_pts_analysis$curv_mean_filt)
+plot(soaproot_pts_analysis$curv_mean_N, soaproot_pts_analysis$curv_mean_filt_true)
+summary(lm(soaproot_pts_analysis$curv_mean_N ~ soaproot_pts_analysis$curv_mean_filt))
+hist(soaproot_pts_analysis$curv_mean_filt_true)
+hist(soaproot_pts_analysis$curv_mean_filt)
+summary(lm(Depth ~ curv_mean_filt_true, data = soaproot_pts_analysis))
+summary(lm(Depth ~ curv_mean_filt, data = soaproot_pts_analysis))
+summary(lm(Depth ~ curv_mean_N, data = soaproot_pts_analysis))
 soaproot_pts_analysis$Depth[soaproot_pts_analysis$Depth > 7.56] <- 7.56
 soaproot_pts_analysis$Depth
 #soaproot_pts_analysis$Depth[soaproot_pts_analysis$Depth==0] <- 0.01 #assume depth is 0.01 where there is rock outcrop
@@ -219,8 +231,23 @@ for(i in 1:length(soaproot_pts_analysis$Depth)) {
   } else {next}
 }
 hist(soaproot_pts_analysis$Depth)
-soaproot_pts_analysis$Depth_log <- log(soaproot_pts_analysis$Depth) 
+soaproot_pts_analysis$Depth_log <- log(soaproot_pts_analysis$Depth)
+summary(lm(Depth_log ~ curv_mean_filt_true, data = soaproot_pts_analysis))
+summary(lm(Depth_log ~ elev_above_str_150, data = soaproot_pts_analysis))
+summary(lm(Depth_log ~ stream_dist_N_150, data = soaproot_pts_analysis))
+summary(lm(Depth_log ~ stream_dist_N_150 + curv_mean_filt_true, data = soaproot_pts_analysis))
+summary(lm(Depth ~ stream_dist_N_150 + curv_mean_filt_true, data = soaproot_pts_analysis))
+soaproot_pts_analysis$depth_class <- ifelse(soaproot_pts_analysis$Depth < 3, 'shallow', ifelse(soaproot_pts_analysis$Depth < 5, 'moderate', 'deep'))
+soaproot_pts_analysis$depth_class <- ifelse(soaproot_pts_analysis$Depth < 5.84, 'moderate', 'deep')
+table(soaproot_pts_analysis$depth_class)
+tapply(soaproot_pts_analysis$curv_mean_filt_true, soaproot_pts_analysis$depth_class, boxplot)
 
+boxplot(curv_mean_filt_true ~ depth_class, data = soaproot_pts_analysis)
+t.test(curv_mean_filt_true ~ depth_class, data = soaproot_pts_analysis)
+boxplot(stream_dist_N_150 ~ depth_class, data = soaproot_pts_analysis)
+t.test(stream_dist_N_150 ~ depth_class, data = soaproot_pts_analysis)
+boxplot(slope_N ~ depth_class, data = soaproot_pts_analysis)
+t.test(slope_N ~ depth_class, data = soaproot_pts_analysis)
 #soaproot_pts_analysis$elev_USGS <- soaproot_pts_original$Elev[match(soaproot_pts_analysis$Site, soaproot_pts_original$Site)]
 #plot(soaproot_pts_analysis$elev_N, soaproot_pts_analysis$elev_USGS)
 soaproot_pts_analysis$Landscape.indicator <- soaproot_pts_original$Landscape.indicator[match(soaproot_pts_analysis$Site, soaproot_pts_original$Site)]
