@@ -1,5 +1,6 @@
 library(car)
 library(vioplot)
+library(raster)
 dataDir <- 'C:/Users/smdevine/Desktop/post doc/czo work'
 FiguresDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/figures'
 resolution <- '5m'
