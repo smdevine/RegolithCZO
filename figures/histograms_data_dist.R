@@ -48,7 +48,7 @@ depths <- df_sites$Depth[df_sites$Depth != 0 & !is.na(df_sites$Depth)]
 
 synthetic_7.56m_gamma(shape = 1.915, scale = 1/0.273)
 
-gamma_depth_dist <- as.data.frame(matrix(data = NA, nrow = 66, ncol = 1000))
+
 #do.call(cbind, 
 gamma_dist <- replicate(10000, sapply(depths, function(y) {if (y == 7.56) {synthetic_7.56m_gamma(shape = 1.915, scale = 1/0.273)} else{y}}))
 log_dist <- replicate(10000, sapply(depths, function(y) {if (y == 7.56) {synthetic_7.56m_log(meanlog=1.773, sdlog=0.904)} else{y}}))
@@ -61,6 +61,11 @@ log_dist_syn <- replicate(10000, rlnorm(66, meanlog=1.773, sdlog=0.904))
 log_dist_syn <- as.data.frame(log_dist_syn)
 norm_dist_syn <- replicate(10000, rnorm(66, mean = 5.591, sd = 2.581))
 norm_dist_syn <- as.data.frame(norm_dist_syn)
+
+mean(sapply(gamma_dist_syn, function(x) quantile(x, 0.9))) #13.55043 for gamma
+mean(sapply(log_dist_syn, function(x) quantile(x, 0.9))) #18.41627 for lognormal
+mean(sapply(norm_dist_syn, function(x) quantile(x, 0.9))) #8.795558 for norm
+
 
 result_gamma_syn <- data.frame(less_than_2.5=sapply(gamma_dist_syn, function(x) sum(x < 2.5)), from_2.5_to_5=sapply(gamma_dist_syn, function(x) sum(x >= 2.5 & x < 5)), from_5_to_7.5=sapply(gamma_dist_syn, function(x) sum(x >= 5 & x < 7.5)), from_7.5_to_10=sapply(gamma_dist_syn, function(x) sum(x >= 7.5 & x < 10)), from_10_to_12.5=sapply(gamma_dist_syn, function(x) sum(x >= 10 & x < 12.5)), from_12.5_to_15=sapply(gamma_dist_syn, function(x) sum(x >= 12.5 & x < 15)), great_than_15=sapply(gamma_dist_syn, function(x) sum(x >= 15)))
 
