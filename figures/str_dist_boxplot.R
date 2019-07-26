@@ -11,6 +11,8 @@ if(resolution == '10m') {
 } else if(resolution == '5m') {
   NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/5m terrain characteristics/5m filtered'
   str_dist <- raster(file.path(NEONterrainDir, 'str_dist_5m.tif'))
+  curv_mean <- raster(file.path(NEONterrainDir, 'curv_mean_5m.tif'))
+  
   } #5m filtered data produced from 7/12/19 arcgis work
 
 library(extrafont)
@@ -23,7 +25,7 @@ res_plots <- 800
 soaproot_pts <- read.csv(file.path(dataDir, 'Soaproot points RF.csv'), stringsAsFactors = FALSE)
 soaproot_pts_WGS84 <- SpatialPointsDataFrame(coords=soaproot_pts[,c('POINT_X', 'POINT_Y')], data = soaproot_pts['Name'], proj4string = CRS('+init=epsg:4326 +proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'))
 soaproot_UTM11N_shp <- spTransform(soaproot_pts_WGS84, CRS("+proj=utm +zone=11 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")) #project from geographic to WGS84 UTM 11N
-soaproot_pts_terrain <- extract(str_dist, soaproot_UTM11N_shp, df=TRUE)
+soaproot_pts_terrain <- extract(stack(str_dist, curv_mean), soaproot_UTM11N_shp, df=TRUE)
 colnames(soaproot_pts_terrain)[2] <- 'str_dist'
 soaproot_pts_terrain$ID <- NULL
 #lapply(soaproot_pts_terrain, summary)
@@ -39,6 +41,7 @@ soaproot_pts_analysis <- soaproot_pts_terrain[grepl('SR.A.', soaproot_pts_terrai
 soaproot_pts_analysis <- soaproot_pts_analysis[!is.na(soaproot_pts_analysis$Depth),] #one point had a NA for depth
 soaproot_pts_analysis$depth_class <- as.factor(ifelse(soaproot_pts_analysis$Depth < 3.3, 1, ifelse(soaproot_pts_analysis$Depth < 7.56, 2, 3))) #1=shallow; 2=moderate; 3=deep
 table(soaproot_pts_analysis$depth_class)
+head(soaproot_pts_analysis)
 boxplot(str_dist ~ depth_class, data = soaproot_pts_analysis)
 result.stream_dist.aov <- aov(str_dist ~ depth_class, data = soaproot_pts_analysis)
 summary(result.stream_dist.aov)
@@ -58,4 +61,10 @@ dev.off()
 tiff(file = file.path(FiguresDir, 'stream_dist_vioplots.tif'), family = 'Times New Roman', pointsize = 11, width = 4.5, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
 par(mar=c(4.5, 4.5, 0.5, 0.5))
 vioplot(soaproot_pts_analysis$str_dist[soaproot_pts_analysis$depth_class==1], soaproot_pts_analysis$str_dist[soaproot_pts_analysis$depth_class==2], soaproot_pts_analysis$str_dist[soaproot_pts_analysis$depth_class==3], xlab=c('Regolith depth class (m)'), ylab='Distance from channel (m)', names=c('Shallow <3.3', 'Moderate 3.3-7.5', 'Deep >7.5'))
+dev.off()
+
+#curvature plot
+tiff(file = file.path(FiguresDir, 'prof_curv_vioplots.tif'), family = 'Times New Roman', pointsize = 11, width = 4.5, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
+par(mar=c(4.5, 4.5, 0.5, 0.5))
+vioplot(soaproot_pts_analysis$curv_prof_N[soaproot_pts_analysis$depth_class==1], soaproot_pts_analysis$curv_prof_N[soaproot_pts_analysis$depth_class==2], soaproot_pts_analysis$curv_prof_N[soaproot_pts_analysis$depth_class==3], xlab=c('Regolith depth class (m)'), ylab='profile curvature', names=c('Shallow <3.3', 'Moderate 3.3-7.5', 'Deep >7.5'))
 dev.off()
