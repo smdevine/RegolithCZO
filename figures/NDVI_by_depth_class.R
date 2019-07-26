@@ -45,18 +45,18 @@ NDVI_plus1SE_by_depth_cl <- NDVI_means_by_depth_cl + NDVI_se_by_depth_cl
 NDVI_minus1SE_by_depth_cl <- NDVI_means_by_depth_cl - NDVI_se_by_depth_cl
 NDVI_dates <- as.Date(sapply(colnames(NDVI_means_by_depth_cl), function(x) substr(x, 5, 12)), format = '%Y%m%d')
 
+#analysis
+anova_results <- lapply(NDVI_landsat8[,1:59], function(x) summary(aov(x ~ NDVI_landsat8$Depth_class)))
+p_values <- sapply(anova_results, function(x) x[[1]][1,5])
+
 #1 standard error (S.E) plot
 gray_colors <- c('gray70', 'gray55', 'gray40')
 class(as.POSIXlt(NDVI_dates, tz='PDT'))
 tiff(file = file.path(FiguresDir, 'NDVI_by_depth_class_1SE.tif'), family = 'Times New Roman', pointsize = 11, width = 9, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
 par(mar=c(2.5, 4.5, 0.5, 0.5))
-plot(as.POSIXlt(c(min(NDVI_dates), max(NDVI_dates))), c(min(NDVI_minus1SE_by_depth_cl[1,])-0.02, max(NDVI_plus1SE_by_depth_cl[1,])+0.02), type='n', xlab='', ylab = 'NDVI', xaxt='n')
-axis.POSIXct(side = 1, x = as.POSIXlt(NDVI_dates))
-test <- as.data.frame(spline(NDVI_dates, NDVI_plus1SE_by_depth_cl[1,]))
-test2 <- as.data.frame(spline(NDVI_dates, NDVI_minus1SE_by_depth_cl[1,]))
-lines(x=as.POSIXlt(test$x*86400, origin='1970-01-01'), y=test$y, col='black')
-lines(x=as.POSIXlt(test2$x*86400, origin='1970-01-01'), y=test2$y, col='black')
-polygon(spline(x=c(NDVI_dates, rev(NDVI_dates)), y=c(NDVI_plus1SE_by_depth_cl[1,], rev(NDVI_minus1SE_by_depth_cl[1,]))),  border=NA, lwd=0.3, col='gray95')
+plot(c(min(NDVI_dates), max(NDVI_dates)), c(min(NDVI_minus1SE_by_depth_cl[1,]), max(NDVI_plus1SE_by_depth_cl[1,])), type='n', xlab='', ylab = 'NDVI', xaxt='n')
+axis.Date(side = 1, x = NDVI_dates)
+polygon(x=c(NDVI_dates, rev(NDVI_dates)), y=c(NDVI_plus1SE_by_depth_cl[1,], rev(NDVI_minus1SE_by_depth_cl[1,])),  border=NA, lwd=0.3, col='gray95')
 #polygon(x=c(NDVI_dates, rev(NDVI_dates)), y=c(NDVI_plus1SE_by_depth_cl[2,], rev(NDVI_minus1SE_by_depth_cl[2,])), border=gray_colors[2], lwd=0.3)
 polygon(x=c(NDVI_dates, rev(NDVI_dates)), y=c(NDVI_plus1SE_by_depth_cl[3,], rev(NDVI_minus1SE_by_depth_cl[3,])), border = NA, lwd=0.3, col='gray90')
 for (i in 1:3) {
@@ -64,6 +64,7 @@ for (i in 1:3) {
   lines(NDVI_dates, NDVI_means_by_depth_cl[i,], col=gray_colors[i], lty=i+1)
   points(NDVI_dates, NDVI_means_by_depth_cl[i,], col=gray_colors[i], pch=i+16, cex=0.5)
 }
+points(NDVI_dates[which(p_values < 0.05)], NDVI_means_by_depth_cl[3,][which(p_values < 0.05)]-0.01, col=gray_colors[i], pch=8, cex=0.5)
 legend('bottomleft', legend=c('shallow regolith (<3.3m) mean NDVI \u00B1 1 S.E.', 'deep regolith (>7.5m) mean NDVI \u00B1 1 S.E.'), lty = c(2,4), pch=c(17,19), col = gray_colors[c(1,3)], pt.cex=0.6, inset = 0.02)
 text(as.Date('2014-06-01'), 0.6, '2012-2015: historic 4-year drought and forest die-off')
 abline(v=as.Date('2015-10-01'), lty=2, lwd=0.7)
