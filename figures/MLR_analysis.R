@@ -3,6 +3,10 @@ dataDir <- 'C:/Users/smdevine/Desktop/post doc/czo work'
 landsat8Dir <- 'C:/Users/smdevine/Desktop/post doc/czo work/landsat8/summaries/finals'
 FiguresDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/figures'
 #read-in and prepare data
+TablesDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/tables'
+#merge with depth data
+df_master <- read.csv(file.path(dataDir, 'Master Data Set_with rock outcrop.csv'), stringsAsFactors = FALSE) #removed biological data from this dataset but it has duplicate rows where multiple biological observations were made at each point; also removed 0's from outcrop (OC) site codes 01-09 to match points dataset labeling
+df_sites <- df_master[match(unique(df_master$Site), df_master$Site), ]
 soaproot_pts <- read.csv(file.path(dataDir, 'Soaproot points RF.csv'), stringsAsFactors = FALSE)
 soaproot_pts_WGS84 <- SpatialPointsDataFrame(coords=soaproot_pts[,c('POINT_X', 'POINT_Y')], data = soaproot_pts['Name'], proj4string = CRS('+init=epsg:4326 +proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'))
 soaproot_UTM11N_shp <- spTransform(soaproot_pts_WGS84, CRS("+proj=utm +zone=11 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")) #project from geographic to WGS84 UTM 11N
@@ -42,17 +46,18 @@ NDVI_by_year <- as.data.frame(t(NDVI_by_year))
 colnames(NDVI_by_year) <- paste0('NDVI_', colnames(NDVI_by_year))
 NDVI_by_year$Site <- row.names(NDVI_by_year)
 
-#merge with depth data
-df_master <- read.csv(file.path(dataDir, 'Master Data Set_with rock outcrop.csv'), stringsAsFactors = FALSE) #removed biological data from this dataset but it has duplicate rows where multiple biological observations were made at each point; also removed 0's from outcrop (OC) site codes 01-09 to match points dataset labeling
-df_sites <- df_master[match(unique(df_master$Site), df_master$Site), ]
 soaproot_pts_analysis <- soaproot_pts_terrain[grepl('SR.A.', soaproot_pts_terrain$Site), ] #leaves out all rock outcrop points
 #merge with annual NDVI means
 soaproot_pts_analysis <- merge(soaproot_pts_analysis, NDVI_by_year, by='Site')
-soaproot_pts_analysis <- soaproot_pts_analysis[!is.na(soaproot_pts_analysis$Depth),] #one point had a NA for depth
 soaproot_pts_analysis$Depth <- df_sites$Depth[match(soaproot_pts_analysis$Site, df_sites$Site)]
+soaproot_pts_analysis <- soaproot_pts_analysis[!is.na(soaproot_pts_analysis$Depth),] #one point had a NA for depth
+
 soaproot_pts_analysis$depth_class <- as.factor(ifelse(soaproot_pts_analysis$Depth < 3.3, 1, ifelse(soaproot_pts_analysis$Depth < 7.56, 2, 3))) #1=shallow; 2=moderate; 3=deep
 soaproot_pts_analysis$depth_class_2 <- as.factor(ifelse(soaproot_pts_analysis$Depth < 5.615, 1, 2)) #1=shallow-moderate; 2=deep
 colnames(soaproot_pts_analysis)
+write.csv(soaproot_pts_analysis, file = file.path(TablesDir, 'terrain_veg_chars_vs Depth_5m_res.csv'), row.names = FALSE)
+
+
 if (resolution=='5m') {
   lapply(soaproot_pts_analysis[,2:24], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))}) } else if (resolution=='10m') {
   lapply(soaproot_pts_analysis[,2:30], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))})
@@ -98,11 +103,15 @@ crossval_lm <- function(df_pts, varname, model='~ stream_dist_N + CTI_N + curv_p
   list(rmse.kfold=rmse, oob.predictions=predictions)
 }
 #need to update subsets based on 5m varnames
-subset1 <- expand.grid(elev_N=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE), ndvi2012_2015avg=c(TRUE, FALSE))
-subset2 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE))
-subset3 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), curv_mean_N=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE), SEI_N=c(TRUE, FALSE))
-subset4 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), TPI_N=c(TRUE, FALSE), solrad_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE))
-subset5 <- expand.grid(CTI_N=c(TRUE, FALSE), curv_prof_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), SEI_N=c(TRUE, FALSE), ndvi2012_2015avg=c(TRUE, FALSE))
+if (resolution=='10m') {
+  subset1 <- expand.grid(elev_N=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE), ndvi2012_2015avg=c(TRUE, FALSE))
+  subset2 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE))
+  subset3 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), curv_mean_N=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE), SEI_N=c(TRUE, FALSE))
+  subset4 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), TPI_N=c(TRUE, FALSE), solrad_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE))
+  subset5 <- expand.grid(CTI_N=c(TRUE, FALSE), curv_prof_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), SEI_N=c(TRUE, FALSE), ndvi2012_2015avg=c(TRUE, FALSE))
+} else if {
+  
+}
 
 model_selection_MLR <- function(df, varname, depth, varDir1, varDir2, n, model_df, var_subset) {
   if(!dir.exists(file.path(modelResults, 'MLR_model_selection', varDir1))) {
