@@ -2,14 +2,15 @@ library(car)
 library(vioplot)
 library(raster)
 dataDir <- 'C:/Users/smdevine/Desktop/post doc/czo work'
-FiguresDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/figures'
 resolution <- '5m'
 # resolution <- '10m'
 if(resolution == '10m') {
   NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/NEON 10m/terrain characteristics'
+  FiguresDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/figures_10m'
   str_dist <- raster(file.path(NEONterrainDir, 'strdist_150.tif'))
 } else if(resolution == '5m') {
   NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/5m terrain characteristics/5m filtered'
+  FiguresDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/figures'
   str_dist <- raster(file.path(NEONterrainDir, 'str_dist_5m.tif'))
   curv_mean <- raster(file.path(NEONterrainDir, 'curv_mean_5m.tif'))
   
@@ -63,8 +64,24 @@ par(mar=c(4.5, 4.5, 0.5, 0.5))
 vioplot(soaproot_pts_analysis$str_dist[soaproot_pts_analysis$depth_class==1], soaproot_pts_analysis$str_dist[soaproot_pts_analysis$depth_class==2], soaproot_pts_analysis$str_dist[soaproot_pts_analysis$depth_class==3], xlab=c('Regolith depth class (m)'), ylab='Distance from channel (m)', names=c('Shallow <3.3', 'Moderate 3.3-7.5', 'Deep >7.5'))
 dev.off()
 
-#curvature plot
+#profile curvature plot
 tiff(file = file.path(FiguresDir, 'prof_curv_vioplots.tif'), family = 'Times New Roman', pointsize = 11, width = 4.5, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
 par(mar=c(4.5, 4.5, 0.5, 0.5))
-vioplot(soaproot_pts_analysis$curv_prof_N[soaproot_pts_analysis$depth_class==1], soaproot_pts_analysis$curv_prof_N[soaproot_pts_analysis$depth_class==2], soaproot_pts_analysis$curv_prof_N[soaproot_pts_analysis$depth_class==3], xlab=c('Regolith depth class (m)'), ylab='profile curvature', names=c('Shallow <3.3', 'Moderate 3.3-7.5', 'Deep >7.5'))
+vioplot(soaproot_pts_analysis$curv_prof_N[soaproot_pts_analysis$depth_class==1], soaproot_pts_analysis$curv_prof_N[soaproot_pts_analysis$depth_class==2], soaproot_pts_analysis$curv_prof_N[soaproot_pts_analysis$depth_class==3], xlab=c('Regolith depth class (m)'), ylab='Profile curvature', names=c('Shallow <3.3', 'Moderate 3.3-7.5', 'Deep >7.5'))
 dev.off()
+
+#CTI plot
+tiff(file = file.path(FiguresDir, 'CTI_vioplots.tif'), family = 'Times New Roman', pointsize = 11, width = 4.5, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
+par(mar=c(4.5, 4.5, 0.5, 0.5))
+vioplot(soaproot_pts_analysis$CTI_N[soaproot_pts_analysis$depth_class==1], soaproot_pts_analysis$CTI_N[soaproot_pts_analysis$depth_class==2], soaproot_pts_analysis$CTI_N[soaproot_pts_analysis$depth_class==3], xlab=c('Regolith depth class (m)'), ylab='Compound topographic index', names=c('Shallow <3.3', 'Moderate 3.3-7.5', 'Deep >7.5'))
+dev.off()
+
+#TWI plot
+tiff(file = file.path(FiguresDir, 'TWI_vioplots.tif'), family = 'Times New Roman', pointsize = 11, width = 4.5, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
+par(mar=c(4.5, 4.5, 0.5, 0.5))
+vioplot(soaproot_pts_analysis$twi_5m[soaproot_pts_analysis$depth_class==1], soaproot_pts_analysis$twi_5m[soaproot_pts_analysis$depth_class==2], soaproot_pts_analysis$twi_5m[soaproot_pts_analysis$depth_class==3], xlab=c('Regolith depth class (m)'), ylab='Topographic wetness index', names=c('Shallow <3.3', 'Moderate 3.3-7.5', 'Deep >7.5'))
+dev.off()
+
+vioplot(soaproot_pts_analysis$TWI_N[soaproot_pts_analysis$depth_class==1], soaproot_pts_analysis$TWI_N[soaproot_pts_analysis$depth_class==2], soaproot_pts_analysis$TWI_N[soaproot_pts_analysis$depth_class==3], xlab=c('Regolith depth class (m)'), ylab='Topographic wetness index', names=c('Shallow <3.3', 'Moderate 3.3-7.5', 'Deep >7.5'))
+
+vioplot(soaproot_pts_analysis$stream_dist_N_150[soaproot_pts_analysis$depth_class==1], soaproot_pts_analysis$stream_dist_N_150[soaproot_pts_analysis$depth_class==2], soaproot_pts_analysis$stream_dist_N_150[soaproot_pts_analysis$depth_class==3], xlab=c('Regolith depth class (m)'), ylab='Topographic wetness index', names=c('Shallow <3.3', 'Moderate 3.3-7.5', 'Deep >7.5'))
