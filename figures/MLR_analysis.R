@@ -11,20 +11,27 @@ soaproot_pts <- read.csv(file.path(dataDir, 'Soaproot points RF.csv'), stringsAs
 soaproot_pts_WGS84 <- SpatialPointsDataFrame(coords=soaproot_pts[,c('POINT_X', 'POINT_Y')], data = soaproot_pts['Name'], proj4string = CRS('+init=epsg:4326 +proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'))
 soaproot_UTM11N_shp <- spTransform(soaproot_pts_WGS84, CRS("+proj=utm +zone=11 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")) #project from geographic to WGS84 UTM 11N
 resolution <- '5m'
+drop_lyrs <- TRUE
 if(resolution == '10m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/NEON 10m/terrain characteristics'
 } else if(resolution == '5m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/5m terrain characteristics/5m filtered'} #5m filtered data produced from 7/12/19 arcgis work
 NEON_terrain <- stack(list.files(NEONterrainDir, full.names = TRUE))
 if(resolution == '10m') {
   NEON_terrain$annsolrad_10m <- NEON_terrain$annsolrad_10m / 1000
   names(NEON_terrain)
-  names(NEON_terrain) <- c('solrad_N', 'aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_150', 'EVI_2017_N', 'EVI_2018_N', 'flowacc_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'stream_dist_N_100', 'stream_dist_N_150', 'stream_dist_N_200', 'stream_dist_N_300', 'stream_dist_N_400', 'TCI_N')
+  names(NEON_terrain) <- c('solrad_N', 'aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_150', 'EVI_2017_N', 'EVI_2018_N', 'flowacc_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'stream_dist_N_100', 'stream_dist_N_150', 'stream_dist_N_200', 'stream_dist_N_300', 'stream_dist_N_400', 'TCI_N', 'TWI_N', 'upslope_area_N')
+if (drop_lyrs) {
+  NEON_terrain <- subset(NEON_terrain, c('solrad_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_150', 'EVI_2017_N', 'EVI_2018_N', 'NDVI_2017_N', 'NDVI_2018_N',  'slope_N', 'stream_dist_N_150', 'TWI_N'))
+}
+  
 } else if(resolution == '5m') {
   NEON_terrain$solrad_5m <- NEON_terrain$solrad_5m / 1000
   names(NEON_terrain)
-  names(NEON_terrain) <- c('aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_N', 'EVI_2017_N', 'EVI_2018_N', 'IMI_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'solrad_N', 'stream_dist_N')
+  names(NEON_terrain) <- c('aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_N', 'EVI_2017_N', 'EVI_2018_N', 'IMI_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'solrad_N', 'stream_dist_N', 'TWI_N', 'upslope_area_5m')
+  NEON_terrain <- subset(NEON_terrain, c('CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_N', 'EVI_2017_N', 'EVI_2018_N', 'NDVI_2017_N', 'NDVI_2018_N',  'slope_N', 'solrad_N', 'stream_dist_N', 'TWI_N'))
 }
-NEON_terrain$TPI_N <- terrain(NEON_terrain$elev_N, opt = 'TPI', neighbors = 8)
-NEON_terrain$TRI_N <- terrain(NEON_terrain$elev_N, opt = 'TRI', neighbors = 8)
+}
+# NEON_terrain$TPI_N <- terrain(NEON_terrain$elev_N, opt = 'TPI', neighbors = 8)
+# NEON_terrain$TRI_N <- terrain(NEON_terrain$elev_N, opt = 'TRI', neighbors = 8)
 soaproot_pts_terrain <- extract(NEON_terrain, soaproot_UTM11N_shp, df=TRUE)
 soaproot_pts_terrain$ID <- NULL
 soaproot_pts_terrain <- cbind(soaproot_UTM11N_shp$Name, soaproot_pts_terrain)
@@ -45,10 +52,14 @@ NDVI_by_year <- apply(NDVI_landsat8[,1:60], 1, function(x) tapply(x, format.Date
 NDVI_by_year <- as.data.frame(t(NDVI_by_year))
 colnames(NDVI_by_year) <- paste0('NDVI_', colnames(NDVI_by_year))
 NDVI_by_year$Site <- row.names(NDVI_by_year)
+NDVI_by_GS <- data.frame(Site=names(apply(NDVI_landsat8[,15:21], 1, mean)), NDVI_summer_2014=apply(NDVI_landsat8[,15:21], 1, mean))
+NDVI_by_GS$NDVI_summer_2015 <- apply(NDVI_landsat8[,27:33], 1, mean)
 
 soaproot_pts_analysis <- soaproot_pts_terrain[grepl('SR.A.', soaproot_pts_terrain$Site), ] #leaves out all rock outcrop points
 #merge with annual NDVI means
 soaproot_pts_analysis <- merge(soaproot_pts_analysis, NDVI_by_year, by='Site')
+soaproot_pts_analysis <- merge(soaproot_pts_analysis, NDVI_by_GS, by='Site')
+
 soaproot_pts_analysis$Depth <- df_sites$Depth[match(soaproot_pts_analysis$Site, df_sites$Site)]
 soaproot_pts_analysis <- soaproot_pts_analysis[!is.na(soaproot_pts_analysis$Depth),] #one point had a NA for depth
 
@@ -57,22 +68,26 @@ soaproot_pts_analysis$depth_class_2 <- as.factor(ifelse(soaproot_pts_analysis$De
 colnames(soaproot_pts_analysis)
 write.csv(soaproot_pts_analysis, file = file.path(TablesDir, 'terrain_veg_chars_vs Depth_5m_res.csv'), row.names = FALSE)
 
-
 if (resolution=='5m') {
-  lapply(soaproot_pts_analysis[,2:24], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))}) } else if (resolution=='10m') {
-  lapply(soaproot_pts_analysis[,2:30], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))})
+  lapply(soaproot_pts_analysis[,2:22], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))}) } else if (resolution=='10m') {
+  lapply(soaproot_pts_analysis[,2:21], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))})
 }
 if (resolution=='5m') {
-  lapply(soaproot_pts_analysis[,2:24], function(x) {summary(lm(x ~ soaproot_pts_analysis$Depth))})
+  lapply(soaproot_pts_analysis[,2:22], function(x) {summary(lm(x ~ soaproot_pts_analysis$Depth))})
 } else if (resolution=='10m') {
-  lapply(soaproot_pts_analysis[,2:30], function(x) {summary(lm(x ~ soaproot_pts_analysis$Depth))})
+  lapply(soaproot_pts_analysis[,2:21], function(x) {summary(lm(x ~ soaproot_pts_analysis$Depth))})
 }
-mapply(function(x,y,z='Depth') 
+plot(aov(CTI_N ~ depth_class, data = soaproot_pts_analysis))
+boxplot(CTI_N ~ depth_class, data = soaproot_pts_analysis)
+mapply(function(x,y,z='Depth')
 {lm_result <- lm(soaproot_pts_analysis[[z]] ~ x)
 plot(x, soaproot_pts_analysis[[z]], main=paste(y, 'r2 = ', round(summary(lm_result)$r.squared, 2)))
-abline(lm_result, lty=2)}, x=soaproot_pts_analysis[,2:25], y=colnames(soaproot_pts_analysis)[2:25])
-
-lapply(soaproot_pts_analysis[soaproot_pts_analysis$Depth < 7.56, 2:25], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class[soaproot_pts_analysis$Depth < 7.56]))})
+abline(lm_result, lty=2)}, x=soaproot_pts_analysis[,2:22], y=colnames(soaproot_pts_analysis)[2:22])
+summary(lm(Depth ~ poly(TWI_N, 2), data = soaproot_pts_analysis))
+summary(lm(log(Depth) ~ TWI_N, data = soaproot_pts_analysis))
+lapply(soaproot_pts_analysis[soaproot_pts_analysis$Depth < 7.56, 2:26], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class[soaproot_pts_analysis$Depth < 7.56]))})
+#this more applicable to <7.56 m dataset
+lapply(soaproot_pts_analysis[soaproot_pts_analysis$Depth < 7.56, 2:22], function(x) {summary(lm(x ~ soaproot_pts_analysis$depth_class[soaproot_pts_analysis$Depth < 7.56]))})
 mapply(function(x,y,z='Depth') 
 {lm_result <- lm(soaproot_pts_analysis[[z]][soaproot_pts_analysis$Depth < 7.56] ~ x)
 plot(x, soaproot_pts_analysis[[z]][soaproot_pts_analysis$Depth < 7.56], main=paste(y, 'r2 = ', round(summary(lm_result)$r.squared, 2)))
