@@ -46,8 +46,13 @@ NDVI_minus1SE_by_depth_cl <- NDVI_means_by_depth_cl - NDVI_se_by_depth_cl
 NDVI_dates <- as.Date(sapply(colnames(NDVI_means_by_depth_cl), function(x) substr(x, 5, 12)), format = '%Y%m%d')
 
 #analysis
-anova_results <- lapply(NDVI_landsat8[,1:59], function(x) summary(aov(x ~ NDVI_landsat8$Depth_class)))
-p_values <- sapply(anova_results, function(x) x[[1]][1,5])
+anova_full <- lapply(NDVI_landsat8[,1:59], function(x) aov(x ~ as.factor(NDVI_landsat8$Depth_class)))
+anova_trim <- lapply(NDVI_landsat8[,1:59], function(x) summary(aov(x ~ NDVI_landsat8$Depth_class)))
+p_values <- sapply(anova_trim, function(x) x[[1]][1,5])
+p_values[which(p_values < 0.05)]
+sig_indices <- which(p_values < 0.05)
+tukey_results <- lapply(anova_full, TukeyHSD)
+tukey_results[sig_indices]
 
 #1 standard error (S.E) plot
 gray_colors <- c('gray70', 'gray55', 'gray40')
@@ -65,8 +70,8 @@ for (i in 1:3) {
   points(NDVI_dates, NDVI_means_by_depth_cl[i,], col=gray_colors[i], pch=i+16, cex=0.5)
 }
 points(NDVI_dates[which(p_values < 0.05)], NDVI_means_by_depth_cl[3,][which(p_values < 0.05)]-0.01, col=gray_colors[i], pch=8, cex=0.5)
-legend('bottomleft', legend=c('shallow regolith (<3.3m) mean NDVI \u00B1 1 S.E.', 'deep regolith (>7.5m) mean NDVI \u00B1 1 S.E.'), lty = c(2,4), pch=c(17,19), col = gray_colors[c(1,3)], pt.cex=0.6, inset = 0.02)
-text(as.Date('2014-06-01'), 0.6, '2012-2015: historic 4-year drought and forest die-off')
+legend('bottomleft', legend=c('shallow regolith (<3.3m) mean NDVI \u00B1 1 S.E.', 'deep regolith (>7.5m) mean NDVI \u00B1 1 S.E.', 'significant contrast (p<0.05)'), lty = c(2,4, NA), pch=c(17,19, 8), col = c(gray_colors[c(1,3)], 'black'), pt.cex=0.6, inset = 0.01)
+text(as.Date('2014-06-01'), 0.61, '2012-2015: historic 4-year drought and forest die-off')
 abline(v=as.Date('2015-10-01'), lty=2, lwd=0.7)
 text(x=as.Date('2016-01-15'), y=0.7, 'average')
 text(x=as.Date('2016-01-15'), y=0.685, 'winter')
