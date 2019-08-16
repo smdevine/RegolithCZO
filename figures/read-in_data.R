@@ -1,3 +1,4 @@
+#note this is current set of reduced number of variables used from NEON Lidar 1-m dem: 'elev_N', 'solrad_N', 'slope_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'TWI_N', 'stream_dist_N_150', 'EVI_2017_N', 'EVI_2018_N'
 library(raster)
 dataDir <- 'C:/Users/smdevine/Desktop/post doc/czo work'
 landsat8Dir <- 'C:/Users/smdevine/Desktop/post doc/czo work/landsat8/summaries/finals'
@@ -11,6 +12,11 @@ df_sites <- df_master[match(unique(df_master$Site), df_master$Site), ]
 soaproot_pts <- read.csv(file.path(dataDir, 'Soaproot points RF.csv'), stringsAsFactors = FALSE)
 soaproot_pts_WGS84 <- SpatialPointsDataFrame(coords=soaproot_pts[,c('POINT_X', 'POINT_Y')], data = soaproot_pts['Name'], proj4string = CRS('+init=epsg:4326 +proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'))
 soaproot_UTM11N_shp <- spTransform(soaproot_pts_WGS84, CRS("+proj=utm +zone=11 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")) #project from geographic to WGS84 UTM 11N
+soaproot_UTM11N_shp_export <- soaproot_UTM11N_shp
+names(soaproot_UTM11N_shp_export)[1] <- 'Site'
+soaproot_UTM11N_shp_export$Depth <- df_sites$Depth[match(soaproot_UTM11N_shp_export$Site, df_sites$Site)]
+soaproot_UTM11N_shp_export <- soaproot_UTM11N_shp_export[soaproot_UTM11N_shp_export$Depth > 0 & !is.na(soaproot_UTM11N_shp_export$Depth), ]
+shapefile(soaproot_UTM11N_shp_export, file.path(FiguresDir, 'soaproot_pts_UTM111N_noOC.shp'))
 resolution <- '10m'
 drop_lyrs <- TRUE
 if(resolution == '10m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/NEON 10m/terrain characteristics'
@@ -21,7 +27,8 @@ if(resolution == '10m') {
   names(NEON_terrain)
   names(NEON_terrain) <- c('solrad_N', 'aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_150', 'EVI_2017_N', 'EVI_2018_N', 'flowacc_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'stream_dist_N_100', 'stream_dist_N_150', 'stream_dist_N_200', 'stream_dist_N_300', 'stream_dist_N_400', 'TCI_N', 'TWI_N', 'upslope_area_N')
   if (drop_lyrs) {
-    NEON_terrain <- subset(NEON_terrain, c('solrad_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'EVI_2017_N', 'EVI_2018_N', 'NDVI_2017_N', 'NDVI_2018_N',  'slope_N', 'stream_dist_N_150', 'TWI_N'))
+    NEON_terrain <- subset(NEON_terrain, c('elev_N', 'solrad_N', 'slope_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'TWI_N', 'stream_dist_N_150', 'EVI_2017_N', 'EVI_2018_N'))
+    names(NEON_terrain)[8] <- 'str_dist_N'
   }
   
 } else if(resolution == '5m') {
@@ -51,13 +58,13 @@ NDVI_by_year <- apply(NDVI_landsat8[,1:60], 1, function(x) tapply(x, format.Date
 NDVI_by_year <- as.data.frame(t(NDVI_by_year))
 colnames(NDVI_by_year) <- paste0('NDVI_', colnames(NDVI_by_year))
 NDVI_by_year$Site <- row.names(NDVI_by_year)
-NDVI_by_GS <- data.frame(Site=names(apply(NDVI_landsat8[,15:21], 1, mean)), NDVI_summer_2014=apply(NDVI_landsat8[,15:21], 1, mean))
-NDVI_by_GS$NDVI_summer_2015 <- apply(NDVI_landsat8[,27:33], 1, mean)
+# NDVI_by_GS <- data.frame(Site=names(apply(NDVI_landsat8[,15:21], 1, mean)), NDVI_summer_2014=apply(NDVI_landsat8[,15:21], 1, mean))
+# NDVI_by_GS$NDVI_summer_2015 <- apply(NDVI_landsat8[,27:33], 1, mean)
 soaproot_pts_terrain$DSD_v2_M <- extract(DSD_v2, soaproot_pts_WGS84) / 10 #latest file from 4/9/19 cropped to previous version extent #because DSD is in units 10 * mm yr^-1; buffer=15, fun=mean improves variance explained only slightly with old estimates of DSD but slope still 1.05
 soaproot_pts_analysis <- soaproot_pts_terrain[grepl('SR.A.', soaproot_pts_terrain$Site), ] #leaves out all rock outcrop points
 #merge with annual NDVI means
 soaproot_pts_analysis <- merge(soaproot_pts_analysis, NDVI_by_year, by='Site')
-soaproot_pts_analysis <- merge(soaproot_pts_analysis, NDVI_by_GS, by='Site')
+# soaproot_pts_analysis <- merge(soaproot_pts_analysis, NDVI_by_GS, by='Site')
 
 soaproot_pts_analysis$Depth <- df_sites$Depth[match(soaproot_pts_analysis$Site, df_sites$Site)]
 soaproot_pts_analysis <- soaproot_pts_analysis[!is.na(soaproot_pts_analysis$Depth),] #one point had a NA for depth
