@@ -1,84 +1,18 @@
-library(raster)
-dataDir <- 'C:/Users/smdevine/Desktop/post doc/czo work'
-landsat8Dir <- 'C:/Users/smdevine/Desktop/post doc/czo work/landsat8/summaries/finals'
-FiguresDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/figures'
-#read-in and prepare data
-TablesDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/tables'
-#merge with depth data
-df_master <- read.csv(file.path(dataDir, 'Master Data Set_with rock outcrop.csv'), stringsAsFactors = FALSE) #removed biological data from this dataset but it has duplicate rows where multiple biological observations were made at each point; also removed 0's from outcrop (OC) site codes 01-09 to match points dataset labeling
-df_sites <- df_master[match(unique(df_master$Site), df_master$Site), ]
-soaproot_pts <- read.csv(file.path(dataDir, 'Soaproot points RF.csv'), stringsAsFactors = FALSE)
-soaproot_pts_WGS84 <- SpatialPointsDataFrame(coords=soaproot_pts[,c('POINT_X', 'POINT_Y')], data = soaproot_pts['Name'], proj4string = CRS('+init=epsg:4326 +proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'))
-soaproot_UTM11N_shp <- spTransform(soaproot_pts_WGS84, CRS("+proj=utm +zone=11 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")) #project from geographic to WGS84 UTM 11N
-resolution <- '5m'
-drop_lyrs <- TRUE
-if(resolution == '10m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/NEON 10m/terrain characteristics'
-} else if(resolution == '5m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/5m terrain characteristics/5m filtered'} #5m filtered data produced from 7/12/19 arcgis work
-NEON_terrain <- stack(list.files(NEONterrainDir, full.names = TRUE))
-if(resolution == '10m') {
-  NEON_terrain$annsolrad_10m <- NEON_terrain$annsolrad_10m / 1000
-  names(NEON_terrain)
-  names(NEON_terrain) <- c('solrad_N', 'aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_150', 'EVI_2017_N', 'EVI_2018_N', 'flowacc_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'stream_dist_N_100', 'stream_dist_N_150', 'stream_dist_N_200', 'stream_dist_N_300', 'stream_dist_N_400', 'TCI_N', 'TWI_N', 'upslope_area_N')
-if (drop_lyrs) {
-  NEON_terrain <- subset(NEON_terrain, c('solrad_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_150', 'EVI_2017_N', 'EVI_2018_N', 'NDVI_2017_N', 'NDVI_2018_N',  'slope_N', 'stream_dist_N_150', 'TWI_N'))
-}
-  
-} else if(resolution == '5m') {
-  NEON_terrain$solrad_5m <- NEON_terrain$solrad_5m / 1000
-  names(NEON_terrain)
-  names(NEON_terrain) <- c('aspect_N', 'CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_N', 'EVI_2017_N', 'EVI_2018_N', 'IMI_N', 'NDVI_2017_N', 'NDVI_2018_N', 'SEI_N', 'slope_N', 'solrad_N', 'stream_dist_N', 'TWI_N', 'upslope_area_5m')
-  NEON_terrain <- subset(NEON_terrain, c('CTI_N', 'curv_mean_N', 'curv_plan_N', 'curv_prof_N', 'elev_N', 'elev_above_str_N', 'EVI_2017_N', 'EVI_2018_N', 'NDVI_2017_N', 'NDVI_2018_N',  'slope_N', 'solrad_N', 'stream_dist_N', 'TWI_N'))
-}
-}
-# NEON_terrain$TPI_N <- terrain(NEON_terrain$elev_N, opt = 'TPI', neighbors = 8)
-# NEON_terrain$TRI_N <- terrain(NEON_terrain$elev_N, opt = 'TRI', neighbors = 8)
-soaproot_pts_terrain <- extract(NEON_terrain, soaproot_UTM11N_shp, df=TRUE)
-soaproot_pts_terrain$ID <- NULL
-soaproot_pts_terrain <- cbind(soaproot_UTM11N_shp$Name, soaproot_pts_terrain)
-colnames(soaproot_pts_terrain)[1] <- 'Site'
-soaproot_pts_terrain$Site <- as.character(soaproot_pts_terrain$Site)
-
-NDVI_landsat8 <- read.csv(file.path(landsat8Dir, 'NDVI_2013_2017_final.csv'), row.names = 1)
-NDVI_landsat8$doy_20160121_ndvi <- NULL
-NDVI_landsat8$Site <- row.names(NDVI_landsat8)
-NDVI_landsat8$Depth <- df_sites$Depth[match(NDVI_landsat8$Site, df_sites$Site)] #they are both in same order but this is safer nonetheless
-include_OC <- FALSE
-NDVI_landsat8 <- NDVI_landsat8[!is.na(NDVI_landsat8$Depth), ]
-if (include_OC) {} else {
-  NDVI_landsat8 <- NDVI_landsat8[NDVI_landsat8$Depth!=0,]
-}
-NDVI_dates <- as.Date(sapply(colnames(NDVI_landsat8)[1:60], function(x) substr(x, 5, 12)), format = '%Y%m%d')
-NDVI_by_year <- apply(NDVI_landsat8[,1:60], 1, function(x) tapply(x, format.Date(NDVI_dates, '%Y'), mean))
-NDVI_by_year <- as.data.frame(t(NDVI_by_year))
-colnames(NDVI_by_year) <- paste0('NDVI_', colnames(NDVI_by_year))
-NDVI_by_year$Site <- row.names(NDVI_by_year)
-NDVI_by_GS <- data.frame(Site=names(apply(NDVI_landsat8[,15:21], 1, mean)), NDVI_summer_2014=apply(NDVI_landsat8[,15:21], 1, mean))
-NDVI_by_GS$NDVI_summer_2015 <- apply(NDVI_landsat8[,27:33], 1, mean)
-
-soaproot_pts_analysis <- soaproot_pts_terrain[grepl('SR.A.', soaproot_pts_terrain$Site), ] #leaves out all rock outcrop points
-#merge with annual NDVI means
-soaproot_pts_analysis <- merge(soaproot_pts_analysis, NDVI_by_year, by='Site')
-soaproot_pts_analysis <- merge(soaproot_pts_analysis, NDVI_by_GS, by='Site')
-
-soaproot_pts_analysis$Depth <- df_sites$Depth[match(soaproot_pts_analysis$Site, df_sites$Site)]
-soaproot_pts_analysis <- soaproot_pts_analysis[!is.na(soaproot_pts_analysis$Depth),] #one point had a NA for depth
-
-soaproot_pts_analysis$depth_class <- as.factor(ifelse(soaproot_pts_analysis$Depth < 3.3, 1, ifelse(soaproot_pts_analysis$Depth < 7.56, 2, 3))) #1=shallow; 2=moderate; 3=deep
-soaproot_pts_analysis$depth_class_2 <- as.factor(ifelse(soaproot_pts_analysis$Depth < 5.615, 1, 2)) #1=shallow-moderate; 2=deep
-colnames(soaproot_pts_analysis)
-write.csv(soaproot_pts_analysis, file = file.path(TablesDir, 'terrain_veg_chars_vs Depth_5m_res.csv'), row.names = FALSE)
-
+#read-in and prepare data and define directories, now using read-in_data.R first
+modelResults <- 'C:/Users/smdevine/Desktop/post doc/czo work/model_results'
 if (resolution=='5m') {
-  lapply(soaproot_pts_analysis[,2:22], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))}) } else if (resolution=='10m') {
-  lapply(soaproot_pts_analysis[,2:21], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))})
+  lapply(soaproot_pts_analysis[,2:22], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))}) 
+} else if (resolution=='10m') {
+  lapply(soaproot_pts_analysis[,2:17], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))})
 }
 if (resolution=='5m') {
   lapply(soaproot_pts_analysis[,2:22], function(x) {summary(lm(x ~ soaproot_pts_analysis$Depth))})
 } else if (resolution=='10m') {
-  lapply(soaproot_pts_analysis[,2:21], function(x) {summary(lm(x ~ soaproot_pts_analysis$Depth))})
+  lapply(soaproot_pts_analysis[,2:17], function(x) {summary(lm(x ~ soaproot_pts_analysis$Depth))})
 }
 plot(aov(CTI_N ~ depth_class, data = soaproot_pts_analysis))
 boxplot(CTI_N ~ depth_class, data = soaproot_pts_analysis)
+
 mapply(function(x,y,z='Depth')
 {lm_result <- lm(soaproot_pts_analysis[[z]] ~ x)
 plot(x, soaproot_pts_analysis[[z]], main=paste(y, 'r2 = ', round(summary(lm_result)$r.squared, 2)))
@@ -86,6 +20,14 @@ abline(lm_result, lty=2)}, x=soaproot_pts_analysis[,2:22], y=colnames(soaproot_p
 summary(lm(Depth ~ poly(TWI_N, 2), data = soaproot_pts_analysis))
 summary(lm(log(Depth) ~ TWI_N, data = soaproot_pts_analysis))
 lapply(soaproot_pts_analysis[soaproot_pts_analysis$Depth < 7.56, 2:26], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class[soaproot_pts_analysis$Depth < 7.56]))})
+
+#tukey test
+aov_dist_twi <- aov(TWI_N ~ depth_class, data = soaproot_pts_analysis)
+TukeyHSD(aov_dist_twi)
+
+aov_dist_channel <- aov(str_dist_N ~ depth_class, data = soaproot_pts_analysis)
+TukeyHSD(aov_dist_channel)
+
 #this more applicable to <7.56 m dataset
 lapply(soaproot_pts_analysis[soaproot_pts_analysis$Depth < 7.56, 2:22], function(x) {summary(lm(x ~ soaproot_pts_analysis$depth_class[soaproot_pts_analysis$Depth < 7.56]))})
 mapply(function(x,y,z='Depth') 
@@ -94,6 +36,15 @@ plot(x, soaproot_pts_analysis[[z]][soaproot_pts_analysis$Depth < 7.56], main=pas
 abline(lm_result, lty=2)}, x=soaproot_pts_analysis[soaproot_pts_analysis$Depth < 7.56, 2:19], y=colnames(soaproot_pts_analysis)[2:19])
 
 #MLR model selection exercise
+synthetic_7.56m_gamma <- function(shape, scale) {
+  success <- FALSE
+  while (!success) {
+    x <- rgamma(1, shape = shape, scale = scale)
+    # check for success
+    success <- x > 7.56
+  }
+  return(x)
+}
 RMSE <- function(observed, predicted) {
   sqrt(mean((predicted - observed)^2, na.rm=TRUE))
 }
@@ -101,8 +52,8 @@ library(dismo)
 set.seed(80140)
 dim(soaproot_pts_analysis)
 kf <- kfold(1:nrow(soaproot_pts_analysis), k=10)
-colnames(soaproot_pts_analysis)
-crossval_lm <- function(df_pts, varname, model='~ stream_dist_N + CTI_N + curv_prof_N + NDVI_2014 + NDVI_2015 + NDVI_2016 + NDVI_2017 + EVI_2017_N + EVI_2018_N + elev_N + slope_N + solrad_N', n) {
+colnames(soaproot_pts_analysis)[c(2:5,8:10,12,15)]
+crossval_lm <- function(df_pts, varname, model=' "elev_N" + "solrad_N" + "slope_N" + "curv_mean_N" + "TWI_N" + "str_dist_N" + "EVI_2017_N" + "DSD_v2_M" + "NDVI_2015"', n) {
   rmse <- rep(NA, length(unique(kf)))
   predictions <- rep(NA, n)
   for (k in 1:length(unique(kf))) {
@@ -118,16 +69,16 @@ crossval_lm <- function(df_pts, varname, model='~ stream_dist_N + CTI_N + curv_p
   list(rmse.kfold=rmse, oob.predictions=predictions)
 }
 #need to update subsets based on 5m varnames
-if (resolution=='10m') {
+if (resolution=='5m') {
   subset1 <- expand.grid(elev_N=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE), ndvi2012_2015avg=c(TRUE, FALSE))
   subset2 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE))
   subset3 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), curv_mean_N=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE), SEI_N=c(TRUE, FALSE))
   subset4 <- expand.grid(stream_dist_N_150=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), TPI_N=c(TRUE, FALSE), solrad_N=c(TRUE, FALSE), OCdist_R=c(TRUE, FALSE))
   subset5 <- expand.grid(CTI_N=c(TRUE, FALSE), curv_prof_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), SEI_N=c(TRUE, FALSE), ndvi2012_2015avg=c(TRUE, FALSE))
-} else if {
-  
+} else if (resolution=='10m') {
+  subset1 <- expand.grid(elev_N=c(TRUE, FALSE), solrad_N=c(TRUE, FALSE), slope_N=c(TRUE, FALSE), curv_mean_N=c(TRUE, FALSE), TWI_N=c(TRUE, FALSE), str_dist_N=c(TRUE, FALSE), EVI_2017_N=c(TRUE, FALSE), DSD_v2_M=c(TRUE, FALSE), NDVI_2015=c(TRUE, FALSE))
 }
-
+colnames(soaproot_pts_analysis)
 model_selection_MLR <- function(df, varname, depth, varDir1, varDir2, n, model_df, var_subset) {
   if(!dir.exists(file.path(modelResults, 'MLR_model_selection', varDir1))) {
     dir.create(file.path(modelResults, 'MLR_model_selection', varDir1))
@@ -180,7 +131,7 @@ run_analysis <- function(version_no, varDir1, var_subset) {
   }
   #hist(soaproot_pts_analysis$Depth)
   soaproot_pts_analysis$Depth_log <- log(soaproot_pts_analysis$Depth) 
-  result <- model_selection_MLR(df=soaproot_pts_analysis, depth = 'gamma_syn', varname = 'Depth_log', varDir1 = varDir1, varDir2 = varDir2, n=66, model_df = 1:5, var_subset = var_subset)
+  result <- model_selection_MLR(df=soaproot_pts_analysis, depth = 'gamma_syn', varname = 'Depth_log', varDir1 = varDir1, varDir2 = varDir2, n=66, model_df = 1:9, var_subset = var_subset)
   write.csv(soaproot_pts_analysis[,c('Site', 'Depth')], file.path(modelResults, 'MLR_model_selection', varDir1, varDir2, paste0('soaproot_pts_syndepths_', version_no, '.csv')), row.names = FALSE)
   result
 }
@@ -191,15 +142,27 @@ finalize_analysis <- function(runs, varDir1, var_subset) { #runs is a vector how
   }))
   write.csv(overall_summary, file.path(modelResults, 'MLR_model_selection', varDir1, 'best_models_summary.csv'), row.names = FALSE)
 }
-finalize_analysis(runs=1:30, varDir1='subset_1', var_subset = subset1)
-finalize_analysis(runs=1:30, varDir1='subset_2', var_subset = subset2)
-finalize_analysis(runs=1:30, varDir1='subset_3', var_subset = subset3)
-finalize_analysis(runs=1:30, varDir1='subset_4', var_subset = subset4)
-finalize_analysis(runs=1:30, varDir1='subset_5', var_subset = subset5)
+finalize_analysis(runs=1:1000, varDir1='10m_res_9var', var_subset = subset1)
+# finalize_analysis(runs=1:30, varDir1='subset_2', var_subset = subset2)
+# finalize_analysis(runs=1:30, varDir1='subset_3', var_subset = subset3)
+# finalize_analysis(runs=1:30, varDir1='subset_4', var_subset = subset4)
+# finalize_analysis(runs=1:30, varDir1='subset_5', var_subset = subset5)
 
 library(randomForest)
-tuneRF(x=soaproot_pts_analysis[ ,3:19], y=soaproot_pts_analysis$depth_class, ntreeTry = 100, stepFactor = 1, improve = 0.02, trace = TRUE)
-rf_all <- randomForest(x=soaproot_pts_analysis[ ,3:19], y=soaproot_pts_analysis$depth_class, mtry = 4, ntree = 500)
+tuneRF(x=soaproot_pts_analysis[ , colnames(subset1)], y=soaproot_pts_analysis$depth_class, ntreeTry = 400, stepFactor = 1, improve = 0.02, trace = TRUE)
+rf_all <- randomForest(x=soaproot_pts_analysis[ ,colnames(subset1)], y=soaproot_pts_analysis$depth_class, mtry = 3, ntree = 200)
+rf_all$importance
+rf_all$confusion
+1 - (rf_all$confusion[1,1] + rf_all$confusion[2,2] + rf_all$confusion[3,3]) / 66 
+write.csv(rf_all$confusion, file.path(TablesDir, 'rf_9vars_confusion_matrix.csv'))
+avg_error <- vector(mode = 'numeric', length = 1000)
+
+for (i in 1:1000) {
+  rf_all <- randomForest(x=soaproot_pts_analysis[ ,colnames(subset1)], y=soaproot_pts_analysis$depth_class, mtry = 3, ntree = 200)
+  avg_error[i] <- 1 - (rf_all$confusion[1,1] + rf_all$confusion[2,2] + rf_all$confusion[3,3]) / 66
+}
+range(avg_error)
+mean(avg_error)
 which(rf_all$importance > 2)
 indices_cols <- c(3, 6:10, 12:13, 17)
 tuneRF(x=soaproot_pts_analysis[ ,indices_cols], y=soaproot_pts_analysis$depth_class, ntreeTry = 100, stepFactor = 1, improve = 0.02, trace = TRUE)
