@@ -154,15 +154,54 @@ rf_all <- randomForest(x=soaproot_pts_analysis[ ,colnames(subset1)], y=soaproot_
 rf_all$importance
 rf_all$confusion
 1 - (rf_all$confusion[1,1] + rf_all$confusion[2,2] + rf_all$confusion[3,3]) / 66 
-write.csv(rf_all$confusion, file.path(TablesDir, 'rf_9vars_confusion_matrix.csv'))
 avg_error <- vector(mode = 'numeric', length = 1000)
+confusion_results <- vector(mode = 'list', length = 1000)
 
 for (i in 1:1000) {
   rf_all <- randomForest(x=soaproot_pts_analysis[ ,colnames(subset1)], y=soaproot_pts_analysis$depth_class, mtry = 3, ntree = 200)
   avg_error[i] <- 1 - (rf_all$confusion[1,1] + rf_all$confusion[2,2] + rf_all$confusion[3,3]) / 66
+  confusion_results[[i]] <- rf_all$confusion[,1:3]
 }
-range(avg_error)
-mean(avg_error)
+
+mat_1_1 <- sapply(confusion_results, function(x) {
+  x[1,1]
+})
+mat_1_2 <- sapply(confusion_results, function(x) {
+  x[1,2]
+})
+mat_1_3 <- sapply(confusion_results, function(x) {
+  x[1,3]
+})
+mat_2_1 <- sapply(confusion_results, function(x) {
+  x[2,1]
+})
+mat_2_2 <- sapply(confusion_results, function(x) {
+  x[2,2]
+})
+mat_2_3 <- sapply(confusion_results, function(x) {
+  x[2,3]
+})
+mat_3_1 <- sapply(confusion_results, function(x) {
+  x[3,1]
+})
+mat_3_2 <- sapply(confusion_results, function(x) {
+  x[3,2]
+})
+mat_3_3 <- sapply(confusion_results, function(x) {
+  x[3,3]
+})
+mean_confusion_matrix <- matrix(data = c(mean(mat_1_1), mean(mat_2_1), mean(mat_3_1), mean(mat_1_2), mean(mat_2_2), mean(mat_3_2), mean(mat_1_3), mean(mat_2_3), mean(mat_3_3)), nrow = 3, ncol = 3)
+sd_confusion_matrix <- matrix(data = c(sd(mat_1_1), sd(mat_2_1), sd(mat_3_1), sd(mat_1_2), sd(mat_2_2), sd(mat_3_2), sd(mat_1_3), sd(mat_2_3), sd(mat_3_3)), nrow = 3, ncol = 3)
+range_confusion_matrix <- matrix(data = c(paste(range(mat_1_1), collapse = '_'), paste(range(mat_2_1), collapse = '_'), paste(range(mat_3_1), collapse = '_'), paste(range(mat_1_2), collapse = '_'), paste(range(mat_2_2), collapse = '_'), paste(range(mat_3_2), collapse = '_'), paste(range(mat_1_3), collapse = '_'), paste(range(mat_2_3), collapse = '_'), paste(range(mat_3_3), collapse = '_')), nrow = 3, ncol = 3)
+write.csv(mean_confusion_matrix, file.path(TablesDir, '10 m analysis', 'rf_9vars_mean_confusion_matrix.csv'))
+write.csv(sd_confusion_matrix, file.path(TablesDir, '10 m analysis', 'rf_9vars_sd_confusion_matrix.csv'))
+write.csv(range_confusion_matrix, file.path(TablesDir, '10 m analysis', 'rf_9vars_range_confusion_matrix.csv'))
+range(avg_error) #40.9 - 62.1
+mean(avg_error) #52.5%
+range(1 - mat_1_1/19) #shallow: 42.1 - 73.4%
+range(1 - mat_2_2/20) #moderate: 45 - 90%
+range(1- mat_3_3/27) #deep: 18.5% - 51.9%
+
 which(rf_all$importance > 2)
 indices_cols <- c(3, 6:10, 12:13, 17)
 tuneRF(x=soaproot_pts_analysis[ ,indices_cols], y=soaproot_pts_analysis$depth_class, ntreeTry = 100, stepFactor = 1, improve = 0.02, trace = TRUE)
