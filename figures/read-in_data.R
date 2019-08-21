@@ -16,7 +16,7 @@ soaproot_UTM11N_shp_export <- soaproot_UTM11N_shp
 names(soaproot_UTM11N_shp_export)[1] <- 'Site'
 soaproot_UTM11N_shp_export$Depth <- df_sites$Depth[match(soaproot_UTM11N_shp_export$Site, df_sites$Site)]
 soaproot_UTM11N_shp_export <- soaproot_UTM11N_shp_export[soaproot_UTM11N_shp_export$Depth > 0 & !is.na(soaproot_UTM11N_shp_export$Depth), ]
-shapefile(soaproot_UTM11N_shp_export, file.path(FiguresDir, 'soaproot_pts_UTM111N_noOC.shp'))
+# shapefile(soaproot_UTM11N_shp_export, file.path(FiguresDir, 'soaproot_pts_UTM111N_noOC.shp'))
 resolution <- '10m'
 drop_lyrs <- TRUE
 if(resolution == '10m') {NEONterrainDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/NEON 10m/terrain characteristics'
