@@ -1,10 +1,6 @@
 #read-in and prepare data and define directories, now using read-in_data.R first
 modelResults <- 'C:/Users/smdevine/Desktop/post doc/czo work/model_results'
-if (resolution=='5m') {
-  lapply(soaproot_pts_analysis[,2:22], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))}) 
-} else if (resolution=='10m') {
-  lapply(soaproot_pts_analysis[,2:17], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class))})
-}
+
 if (resolution=='5m') {
   lapply(soaproot_pts_analysis[,2:22], function(x) {summary(lm(x ~ soaproot_pts_analysis$Depth))})
 } else if (resolution=='10m') {
@@ -21,14 +17,8 @@ summary(lm(Depth ~ poly(TWI_N, 2), data = soaproot_pts_analysis))
 summary(lm(log(Depth) ~ TWI_N, data = soaproot_pts_analysis))
 lapply(soaproot_pts_analysis[soaproot_pts_analysis$Depth < 7.56, 2:26], function(x) {summary(aov(x ~ soaproot_pts_analysis$depth_class[soaproot_pts_analysis$Depth < 7.56]))})
 
-#tukey test
-aov_dist_twi <- aov(TWI_N ~ depth_class, data = soaproot_pts_analysis)
-TukeyHSD(aov_dist_twi)
 
-aov_dist_channel <- aov(str_dist_N ~ depth_class, data = soaproot_pts_analysis)
-TukeyHSD(aov_dist_channel)
-
-#this more applicable to <7.56 m dataset
+#this applicable to <7.56 m dataset
 lapply(soaproot_pts_analysis[soaproot_pts_analysis$Depth < 7.56, 2:22], function(x) {summary(lm(x ~ soaproot_pts_analysis$depth_class[soaproot_pts_analysis$Depth < 7.56]))})
 mapply(function(x,y,z='Depth') 
 {lm_result <- lm(soaproot_pts_analysis[[z]][soaproot_pts_analysis$Depth < 7.56] ~ x)

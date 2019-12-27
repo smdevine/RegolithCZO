@@ -128,6 +128,72 @@ axis.Date(side = 1, x = NDVI_dates)
 legend('bottomleft', legend=c('shallow (<3.3m) mean NDVI \u00B1 1 S.E.', 'deep (>7.5m) mean NDVI \u00B1 1 S.E.'), lty = c(2,4), pch=c(17,19), col = gray_colors[c(1,3)], pt.cex=0.5, inset = 0.02)
 dev.off()
 
+
+#transform NDVI to ET via this equation:
+#ET (mm) = 117.16 * exp(2.8025*NDVI))
+colnames(NDVI_landsat8)
+dim(NDVI_landsat8)
+
+ET_est_landsat8 <- as.data.frame(do.call(cbind, lapply(NDVI_landsat8[,1:59], function(y) {
+  sapply(y, function(x) {
+    117.16 * exp(2.8025*x)
+  })
+})
+))
+dim(ET_est_landsat8)
+ET_est_landsat8$Depth_class <- NDVI_landsat8$Depth_class
+
+ET_est_means_by_depth_cl <- do.call(cbind, lapply(ET_est_landsat8[,1:59], function(x) {tapply(x, ET_est_landsat8$Depth_class, mean)}))
+ET_est_sd_by_depth_cl <- do.call(cbind, lapply(ET_est_landsat8[,1:59], function(x) {tapply(x, ET_est_landsat8$Depth_class, sd)}))
+ET_est_n_by_depth_cl <- do.call(cbind, lapply(ET_est_landsat8[,1:59], function(x) {tapply(x, ET_est_landsat8$Depth_class, length)}))
+ET_est_75q_by_depth_cl <- do.call(cbind, lapply(ET_est_landsat8[,1:59], function(x) {tapply(x, ET_est_landsat8$Depth_class, function(y) {quantile(y, probs = 0.75)})}))
+ET_est_25q_by_depth_cl <- do.call(cbind, lapply(ET_est_landsat8[,1:59], function(x) {tapply(x, ET_est_landsat8$Depth_class, function(y) {quantile(y, probs = 0.25)})}))
+ET_est_CI95_by_depth_cl <- 1.96 * ET_est_sd_by_depth_cl / sqrt(ET_est_n_by_depth_cl)
+ET_est_se_by_depth_cl <- ET_est_sd_by_depth_cl / sqrt(ET_est_n_by_depth_cl)
+ET_est_plus1SE_by_depth_cl <- ET_est_means_by_depth_cl + ET_est_se_by_depth_cl
+ET_est_minus1SE_by_depth_cl <- ET_est_means_by_depth_cl - ET_est_se_by_depth_cl
+ET_est_dates <- as.Date(sapply(colnames(ET_est_means_by_depth_cl), function(x) substr(x, 5, 12)), format = '%Y%m%d')
+
+#analysis
+anova_full <- lapply(ET_est_landsat8[,1:59], function(x) aov(x ~ as.factor(ET_est_landsat8$Depth_class)))
+anova_trim <- lapply(ET_est_landsat8[,1:59], function(x) summary(aov(x ~ ET_est_landsat8$Depth_class)))
+p_values_ET <- sapply(anova_trim, function(x) x[[1]][1,5])
+p_values_ET[which(p_values_ET < 0.05)]
+sig_indices <- which(p_values_ET < 0.05)
+tukey_results <- lapply(anova_full, TukeyHSD)
+tukey_results[sig_indices]
+
+#1 standard error (S.E) plot
+gray_colors <- c('gray70', 'gray55', 'gray40')
+class(as.POSIXlt(ET_est_dates, tz='PDT'))
+tiff(file = file.path(FiguresDir, 'ET_est_by_depth_class_1SE.tif'), family = 'Times New Roman', pointsize = 11, width = 9, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
+par(mar=c(2.5, 4.5, 0.5, 0.5))
+plot(c(min(ET_est_dates), max(ET_est_dates)), c(min(ET_est_minus1SE_by_depth_cl[1,]), max(ET_est_plus1SE_by_depth_cl[1,])), type='n', xlab='', ylab = 'Evapotranspiration (mm)', xaxt='n')
+axis.Date(side = 1, x = ET_est_dates)
+polygon(x=c(ET_est_dates, rev(ET_est_dates)), y=c(ET_est_plus1SE_by_depth_cl[1,], rev(ET_est_minus1SE_by_depth_cl[1,])),  border=NA, lwd=0.3, col='gray95')
+#polygon(x=c(ET_est_dates, rev(ET_est_dates)), y=c(ET_est_plus1SE_by_depth_cl[2,], rev(ET_est_minus1SE_by_depth_cl[2,])), border=gray_colors[2], lwd=0.3)
+polygon(x=c(ET_est_dates, rev(ET_est_dates)), y=c(ET_est_plus1SE_by_depth_cl[3,], rev(ET_est_minus1SE_by_depth_cl[3,])), border = NA, lwd=0.3, col='gray90')
+for (i in 1:3) {
+  if(i==2) {next}
+  lines(ET_est_dates, ET_est_means_by_depth_cl[i,], col=gray_colors[i], lty=i+1)
+  points(ET_est_dates, ET_est_means_by_depth_cl[i,], col=gray_colors[i], pch=i+16, cex=0.5)
+}
+points(ET_est_dates[which(p_values_ET < 0.05)], ET_est_means_by_depth_cl[3,][which(p_values_ET < 0.05)]-25, col=gray_colors[i], pch=8, cex=0.5)
+legend('bottomleft', legend=c('shallow regolith (<3.3m) mean ET_est \u00B1 1 S.E.', 'deep regolith (>7.5m) mean ET_est \u00B1 1 S.E.', 'significant contrast (p<0.05)'), lty = c(2,4, NA), pch=c(17,19, 8), col = c(gray_colors[c(1,3)], 'black'), pt.cex=0.6, inset = 0.01)
+text(as.Date('2014-06-01'), 0.61, '2012-2015: historic 4-year drought and forest die-off')
+abline(v=as.Date('2015-10-01'), lty=2, lwd=0.7)
+text(x=as.Date('2016-01-15'), y=0.7, 'average')
+text(x=as.Date('2016-01-15'), y=0.685, 'winter')
+abline(v=as.Date('2016-05-01'), lty=2, lwd=0.7)
+abline(v=as.Date('2016-10-01'), lty=2, lwd=0.7)
+text(x=as.Date('2017-01-15'), y=0.7, 'historic')
+text(x=as.Date('2017-01-15'), y=0.685, 'wet winter')
+abline(v=as.Date('2017-05-01'), lty=2, lwd=0.7)
+#text(x=as.Date('2017-02-25'), y=0.55, labels='official end of drought')
+dev.off()
+
+
+
 ##ggplot trial
 library(ggplot2)
 NDVI_means_by_depth_cl_tr <- as.data.frame(t(NDVI_means_by_depth_cl))
