@@ -99,3 +99,10 @@ dev.off()
 
 #previous version
 bar_stats <- barplot(height = barplot_matrix, space = c(0,0.5), xaxt = 'n', xlab='', ylab='Soaproot watershed area (%)', beside=TRUE, legend.text=c('actual samples', 'fitted gamma', 'fitted lognormal', 'fitted normal'), axes=TRUE)
+
+tiff(file = file.path(FiguresDir, 'site overview', 'reg_depth_histogram.tif'), family = 'Times New Roman', pointsize = 11, width = 3.5, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
+par(mar=c(3.75, 4.5, 0.5, 0.5))
+hist(soaproot_pts_analysis$Depth, breaks=c(1, 2, 3, 4, 5, 6, 7, 8), main=NULL, xlab='', ylab='Count', axes=TRUE, xaxt='n') #labels=c(rep('', 6), '> 7.5')
+axis(side = 1, at = 1:7, labels = c(1:6, '>7'), tick = TRUE)
+mtext(text='Regolith depth (m)', side = 1, line = 2.5, at=4)
+dev.off()
