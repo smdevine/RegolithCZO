@@ -1,4 +1,5 @@
 #directories refer to lab desktop
+library(corrplot)
 library(prism)
 downloadDir <- 'C:/Users/smdevine/Desktop/PostDoc/CZO/prism_annual'
 options(prism.path = downloadDir)
@@ -15,6 +16,7 @@ NDVI_to_ET <- function(y) {
 library(raster)
 soaproot_pts <- read.csv(file.path(dataDir, 'sampling pts', 'Soaproot points RF.csv'), stringsAsFactors = FALSE)
 soaproot_AWC <- read.csv(file.path(dataDir, 'sampling pts', 'site_awc_estimates.csv'), stringsAsFactors = FALSE)
+soaproot_terrain_data <- read.csv(file.path(dataDir, 'results', 'tables', 'data', 'terrain_veg_chars_vs Depth_10m_res.csv'), stringsAsFactors = FALSE)
 #CRS("+init=epsg:4326") #this is geographic coordinates using WGS84 datum
 #CRS("+init=epsg:4269") #this is geographic coordinates using NAD83 datum
 soaproot_pts_WGS84 <- SpatialPointsDataFrame(coords=soaproot_pts[,c('POINT_X', 'POINT_Y')], data = soaproot_pts['Name'], proj4string = CRS('+init=epsg:4326 +proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'))
@@ -57,6 +59,43 @@ head(soaproot_remote_data_WGS84[,c('Site', 'AWS_mm')])
 soaproot_remote_data_WGS84[soaproot_remote_data_WGS84$Depth < 2, c('Site', 'AWS_mm')]
 soaproot_remote_data_WGS84$latitude_WGS84 <- coordinates(soaproot_pts_WGS84)[match(soaproot_remote_data_WGS84$Site, soaproot_pts_WGS84$Name),2]
 soaproot_remote_data_WGS84$longitutde_WGS84 <- coordinates(soaproot_pts_WGS84)[match(soaproot_remote_data_WGS84$Site, soaproot_pts_WGS84$Name),1]
+
+#remote data
+deltaNDMI <- function(year) {
+  soaproot_remote_data_WGS84[[paste0('deltaNDMI_', year)]] <- soaproot_remote_data_WGS84[[paste0('MeanNDMIyear', year)]] - apply(soaproot_remote_data_WGS84[,c('MeanNDMIyear2009', 'MeanNDMIyear2010', 'MeanNDMIyear2011')], 1, mean)
+  soaproot_remote_data_WGS84
+}
+
+soaproot_remote_data_WGS84 <- deltaNDMI(2012)
+soaproot_remote_data_WGS84 <- deltaNDMI(2013)
+soaproot_remote_data_WGS84 <- deltaNDMI(2014)
+soaproot_remote_data_WGS84 <- deltaNDMI(2015)
+soaproot_remote_data_WGS84 <- deltaNDMI(2016)
+soaproot_remote_data_WGS84 <- deltaNDMI(2017)
+lapply(soaproot_remote_data_WGS84[,which(grepl('delta', colnames(soaproot_remote_data_WGS84)))], hist)
+plot(soaproot_remote_data_WGS84$Depth, soaproot_remote_data_WGS84$deltaNDMI_2014)
+plot(soaproot_remote_data_WGS84$Depth, soaproot_remote_data_WGS84$deltaNDMI_2015)
+plot(soaproot_remote_data_WGS84$Depth, soaproot_remote_data_WGS84$deltaNDMI_2016)
+plot(soaproot_remote_data_WGS84$Depth, soaproot_remote_data_WGS84$deltaNDMI_2017)
+
+#get some correlation plots
+#amongst annual NDVI and NDMI
+colnames(soaproot_remote_data_WGS84) #2-17 are for NDMI and NDVI
+cor_result <- cor(soaproot_remote_data_WGS84[,2:17], method = 'pearson')
+mag.factor <- 2
+cex.before <- par("cex") #saves current cex setting for plotting
+par(cex = 0.7)  #set cex for plotting text.  this invisibly affects p-value text
+corrplot(cor_result, type = 'lower', diag = TRUE, order = 'AOE', hclust.method = 'ward.D2', tl.col = 'black', tl.srt = 30, cl.ratio = 0.2, cl.align.text = 'c', p.mat = cor.mtest(soaproot_remote_data_WGS84[,2:17], method = 'pearson')[[1]], sig.level = 0.01, insig='p-value', tl.cex = par("cex") * mag.factor, cl.cex = par("cex") * mag.factor)
+par(cex = cex.before)
+
+#amongst annual NDVI and delta NDMI
+colnames(soaproot_remote_data_WGS84) #11-17 are for NDVI and 25-30 are for delta NDMI
+cor_result <- cor(soaproot_remote_data_WGS84[ ,c(11:17,25:30)], method = 'pearson')
+mag.factor <- 2
+cex.before <- par("cex") #saves current cex setting for plotting
+par(cex = 0.7)  #set cex for plotting text.  this invisibly affects p-value text
+corrplot(cor_result, type = 'lower', diag = TRUE, order = 'original', tl.col = 'black', tl.srt = 30, cl.ratio = 0.2, cl.align.text = 'c', p.mat = cor.mtest(soaproot_remote_data_WGS84[,c(11:17,25:30)], method = 'pearson')[[1]], sig.level = 0.01, insig='p-value', tl.cex = par("cex") * mag.factor, cl.cex = par("cex") * mag.factor) #hclust.method = 'ward.D2',
+par(cex = cex.before)
 
 soaproot_center <- SpatialPoints(coords=data.frame(longitutde_WGS84=mean(soaproot_remote_data_WGS84$longitutde_WGS84), latitude_WGS84=mean(soaproot_remote_data_WGS84$latitude_WGS84)), proj4string=CRS('+init=epsg:4326 +proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'))
 plot(soaproot_pts_WGS84[match(soaproot_remote_data_WGS84$Site, soaproot_pts_WGS84$Name), ], col='black')
@@ -112,14 +151,115 @@ AWS_proportion_results$Depth <- soaproot_remote_data_WGS84$Depth
 AWS_proportion_results$Depth_class <- soaproot_remote_data_WGS84$Depth_class
 lapply(AWS_proportion_results[,2:9], function(x) tapply(x, AWS_proportion_results$Depth_class, summary))
 
-plot(AWS_proportion_results$AWS_2013_mm, soaproot_remote_data_WGS84$MeanNDMIyear2016*NDVI_scale_factor)
-plot(AWS_proportion_results$AWS_2014_mm, soaproot_remote_data_WGS84$MeanNDMIyear2016*NDVI_scale_factor)
-plot(AWS_proportion_results$AWS_2015_mm, soaproot_remote_data_WGS84$MeanNDMIyear2016*NDVI_scale_factor)
+plot(AWS_proportion_results$AWS_2012_mm, soaproot_remote_data_WGS84$MeanNDMIyear2013*NDVI_scale_factor)
+plot(AWS_proportion_results$AWS_2013_mm, soaproot_remote_data_WGS84$MeanNDMIyear2013*NDVI_scale_factor)
+plot(AWS_proportion_results$AWS_2014_mm, soaproot_remote_data_WGS84$MeanNDMIyear2014*NDVI_scale_factor)
+plot(AWS_proportion_results$AWS_2015_mm, soaproot_remote_data_WGS84$MeanNDMIyear2015*NDVI_scale_factor)
 plot(AWS_proportion_results$AWS_2016_mm, soaproot_remote_data_WGS84$MeanNDMIyear2016*NDVI_scale_factor)
 plot(AWS_proportion_results$AWS_2017_mm, soaproot_remote_data_WGS84$MeanNDMIyear2017*NDVI_scale_factor)
-summary(lm(soaproot_remote_data_WGS84$MeanNDMIyear2016*NDVI_scale_factor ~ AWS_proportion_results$AWS_2016_mm))
-summary(lm(soaproot_remote_data_WGS84$MeanNDMIyear2016 ~ soaproot_remote_data_WGS84$Depth + soaproot_remote_data_WGS84$MeanNDVIyear2014))
-plot(AWS_results$AWS_2010_mm, soaproot_remote_data_WGS84$MeanNDMIyear2016*NDVI_scale_factor)
+
+
+#make some comparisions with terrain data
+all(soaproot_remote_data_WGS84$Site==soaproot_terrain_data$Site)
+summary(lm(soaproot_remote_data_WGS84$MeanNDMIyear2016 ~ soaproot_remote_data_WGS84$Depth + soaproot_remote_data_WGS84$MeanNDVIyear2012 + soaproot_terrain_data$stream_dist_N_150))
+summary(lm(soaproot_remote_data_WGS84$MeanNDMIyear2016 ~ soaproot_terrain_data$stream_dist_N_150))
+summary(lm(soaproot_remote_data_WGS84$MeanNDMIyear2015 ~ soaproot_terrain_data$stream_dist_N_150 + AWS_proportion_results$AWS_2015_mm))
+summary(lm(soaproot_remote_data_WGS84$MeanNDMIyear2014 ~ soaproot_terrain_data$stream_dist_N_150 + AWS_proportion_results$AWS_2014_mm))
+
+#corrplot of delta NDMI
+#get some correlation plots
+colnames(soaproot_remote_data_WGS84) #25-30 are for delta NDMI only
+cor_result <- cor(cbind(soaproot_remote_data_WGS84[,25:30], AWS_proportion_results[,3:8]), method = 'pearson')
+mag.factor <- 2
+cex.before <- par("cex") #saves current cex setting for plotting
+par(cex = 0.7)  #set cex for plotting text.  this invisibly affects p-value text
+corrplot(cor_result, type = 'lower', diag = TRUE, order = 'original', tl.col = 'black', tl.srt = 30, cl.ratio = 0.2, cl.align.text = 'c', p.mat = cor.mtest(cbind(soaproot_remote_data_WGS84[,25:30], AWS_proportion_results[,3:8]), method = 'pearson')[[1]], sig.level = 0.01, insig='p-value', tl.cex = par("cex") * mag.factor, cl.cex = par("cex") * mag.factor) #when order is AOE hclust.method = 'ward.D2'
+par(cex = cex.before)
+
+#corrplot of AWS_results and delta NDMI
+#get some correlation plots
+colnames(soaproot_remote_data_WGS84) #25-30 are for delta NDMI only
+colnames(AWS_proportion_results) #3-8 are 2011-2016 results
+cor_result <- cor(cbind(soaproot_remote_data_WGS84[,25:30], AWS_proportion_results[,3:8]), method = 'pearson')
+mag.factor <- 2
+cex.before <- par("cex") #saves current cex setting for plotting
+par(cex = 0.7)  #set cex for plotting text.  this invisibly affects p-value text
+corrplot(cor_result, type = 'lower', diag = TRUE, order = 'original', tl.col = 'black', tl.srt = 30, cl.ratio = 0.2, cl.align.text = 'c', p.mat = cor.mtest(cbind(soaproot_remote_data_WGS84[,25:30], AWS_proportion_results[,3:8]), method = 'pearson')[[1]], sig.level = 0.01, insig='p-value', tl.cex = par("cex") * mag.factor, cl.cex = par("cex") * mag.factor) #when order is AOE hclust.method = 'ward.D2'
+par(cex = cex.before)
+
+plot(apply(soaproot_remote_data_WGS84[,2:10], 2, mean)*0.0001, type='b', ylab='mean NDMI, regolith sampling points', xaxt='n', xlab='Year')
+axis(side=1, at=1:9, labels=2009:2017)
+plot(apply(soaproot_remote_data_WGS84[,11:18], 2, mean)*0.0001, type='b', ylab='mean NDVI, regolith sampling points', xaxt='n', xlab='Year')
+axis(side=1, at=1:8, labels=2010:2017)
+
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$stream_dist_N_150)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$curv_mean_N)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_remote_data_WGS84$MeanNDVIyear2010)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150+soaproot_remote_data_WGS84$MeanNDVIyear2010)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ AWS_proportion_results$AWS_2013_mm + soaproot_terrain_data$stream_dist_N_150+soaproot_remote_data_WGS84$MeanNDVIyear2010)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ AWS_proportion_results$AWS_2014_mm + soaproot_terrain_data$stream_dist_N_150+soaproot_remote_data_WGS84$MeanNDVIyear2010)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150 + soaproot_terrain_data$curv_mean_N)))
+summary(lm(soaproot_remote_data_WGS84$MeanNDVIyear2010 ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150))
+summary(lm(soaproot_remote_data_WGS84$MeanNDVIyear2010 ~ soaproot_remote_data_WGS84$Depth))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150 + AWS_proportion_results$AWS_2013_mm)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150 + AWS_results$AWS_2013_mm)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150 + AWS_proportion_results$AWS_2014_mm)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150 + AWS_results$AWS_2014_mm)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150 + AWS_proportion_results$AWS_2015_mm)))
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$elev_N + soaproot_terrain_data$stream_dist_N_150 + AWS_results$AWS_2015_mm)))
+
+lapply(soaproot_remote_data_WGS84[,25:30], function(x) summary(lm(x ~ soaproot_terrain_data$stream_dist_N_150 + as.factor(soaproot_remote_data_WGS84$Depth_class))))
+plot(AWS_proportion_results$Depth, soaproot_remote_data_WGS84$MeanNDMIyear2016)
+
+#corrplot of AWS_results and NDMI
+#get some correlation plots
+colnames(soaproot_remote_data_WGS84) #2-9 are for NDMI only
+colnames(AWS_proportion_results) #3-8 are 2011-2016 results
+cor_result <- cor(cbind(soaproot_remote_data_WGS84[,2:9], AWS_proportion_results[,3:8]), method = 'pearson')
+mag.factor <- 2
+cex.before <- par("cex") #saves current cex setting for plotting
+par(cex = 0.7)  #set cex for plotting text.  this invisibly affects p-value text
+corrplot(cor_result, type = 'lower', diag = TRUE, order = 'original', tl.col = 'black', tl.srt = 30, cl.ratio = 0.2, cl.align.text = 'c', p.mat = cor.mtest(cbind(soaproot_remote_data_WGS84[,2:9], AWS_proportion_results[,3:8]), method = 'pearson')[[1]], sig.level = 0.01, insig='p-value', tl.cex = par("cex") * mag.factor, cl.cex = par("cex") * mag.factor) #when order is AOE hclust.method = 'ward.D2'
+par(cex = cex.before)
+plot(soaproot_remote_data_WGS84$MeanNDVIyear2015, AWS_proportion_results$AWS_2015_mm, col=ifelse(AWS_proportion_results$Depth_class==3, 'red', 'black'))
+plot(soaproot_remote_data_WGS84$MeanNDMIyear2015, AWS_proportion_results$AWS_2015_mm, col=ifelse(AWS_proportion_results$Depth_class==3, 'red', 'black'))
+plot(AWS_proportion_results$Depth, soaproot_remote_data_WGS84$MeanNDMIyear2010)
+plot(AWS_proportion_results$Depth, soaproot_remote_data_WGS84$MeanNDMIyear2016)
+
+#corrplot of AWS_results_proportion and NDMI
+colnames(soaproot_remote_data_WGS84) #2-9 are for NDMI only
+colnames(AWS_proportion_results) #3-8 are 2011-2016 results
+cor_result <- cor(cbind(soaproot_remote_data_WGS84[,2:9], AWS_proportion_results[,3:8]), method = 'pearson')
+mag.factor <- 2
+cex.before <- par("cex") #saves current cex setting for plotting
+par(cex = 0.7)  #set cex for plotting text.  this invisibly affects p-value text
+corrplot(cor_result, type = 'lower', diag = TRUE, order = 'original', tl.col = 'black', tl.srt = 30, cl.ratio = 0.2, cl.align.text = 'c', p.mat = cor.mtest(cbind(soaproot_remote_data_WGS84[,2:9], AWS_proportion_results[,3:8]), method = 'pearson')[[1]], sig.level = 0.01, insig='p-value', tl.cex = par("cex") * mag.factor, cl.cex = par("cex") * mag.factor) #when order is AOE hclust.method = 'ward.D2'
+par(cex = cex.before)
+
+#corrplot of AWS_results_proportion and NDVI
+colnames(soaproot_remote_data_WGS84) #10-17 are for NDVI only
+colnames(AWS_proportion_results) #3-8 are 2011-2016 results
+cor_result <- cor(cbind(soaproot_remote_data_WGS84[,10:17], AWS_proportion_results[,3:8]), method = 'pearson')
+mag.factor <- 2
+cex.before <- par("cex") #saves current cex setting for plotting
+par(cex = 0.7)  #set cex for plotting text.  this invisibly affects p-value text
+corrplot(cor_result, type = 'lower', diag = TRUE, order = 'original', tl.col = 'black', tl.srt = 30, cl.ratio = 0.2, cl.align.text = 'c', p.mat = cor.mtest(cbind(soaproot_remote_data_WGS84[,10:17], AWS_proportion_results[,3:8]), method = 'pearson')[[1]], sig.level = 0.01, insig='p-value', tl.cex = par("cex") * mag.factor, cl.cex = par("cex") * mag.factor) #when order is AOE hclust.method = 'ward.D2'
+par(cex = cex.before)
+
+#corrplot of AWS_results (absolute) and NDMI
+colnames(soaproot_remote_data_WGS84) #2-9 are for NDMI only
+colnames(AWS_results) #3-8 are 2011-2016 results
+cor_result <- cor(cbind(soaproot_remote_data_WGS84[,2:9], AWS_results[,3:8]), method = 'pearson')
+mag.factor <- 2
+cex.before <- par("cex") #saves current cex setting for plotting
+par(cex = 0.7)  #set cex for plotting text.  this invisibly affects p-value text
+corrplot(cor_result, type = 'lower', diag = TRUE, order = 'original', tl.col = 'black', tl.srt = 30, cl.ratio = 0.2, cl.align.text = 'c', p.mat = cor.mtest(cbind(soaproot_remote_data_WGS84[,2:9], AWS_results[,3:8]), method = 'pearson')[[1]], sig.level = 0.01, insig='p-value', tl.cex = par("cex") * mag.factor, cl.cex = par("cex") * mag.factor) #when order is AOE hclust.method = 'ward.D2'
+par(cex = cex.before)
+
+#calc deltaNDMI for 2015-2017
+
 
 #plot NDMI (need to substitute NDVI)
 NDVI_means_by_depth_cl <- do.call(cbind, lapply(NDVI_landsat8[,1:59], function(x) {tapply(x, NDVI_landsat8$Depth_class, mean)}))
