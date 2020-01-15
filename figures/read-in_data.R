@@ -72,3 +72,4 @@ soaproot_pts_analysis <- soaproot_pts_analysis[!is.na(soaproot_pts_analysis$Dept
 soaproot_pts_analysis$depth_class <- as.factor(ifelse(soaproot_pts_analysis$Depth < 3.3, 1, ifelse(soaproot_pts_analysis$Depth < 7.56, 2, 3))) #1=shallow; 2=moderate; 3=deep
 #soaproot_pts_analysis$depth_class_2 <- as.factor(ifelse(soaproot_pts_analysis$Depth < 5.615, 1, 2)) #1=shallow-moderate; 2=deep
 colnames(soaproot_pts_analysis)
+#write.csv(soaproot_pts_analysis, file.path(dataDir, 'results', 'tables', 'data',))
