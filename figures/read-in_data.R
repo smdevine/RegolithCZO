@@ -3,6 +3,7 @@ library(raster)
 dataDir <- 'C:/Users/smdevine/Desktop/post doc/czo work'
 landsat8Dir <- 'C:/Users/smdevine/Desktop/post doc/czo work/landsat8/summaries/finals'
 FiguresDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/figures'
+
 #read-in and prepare data
 TablesDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/tables'
 DSDdir <- 'C:/Users/smdevine/Desktop/post doc/czo work/DSD Mike'
