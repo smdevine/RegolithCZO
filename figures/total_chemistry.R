@@ -14,6 +14,12 @@ colnames(tot_elem_df)
 lapply(tot_elem_df, class)
 tot_elem_df$regDepth <- soaproot_pts_analysis$Depth[match(tot_elem_df$Site, soaproot_pts_analysis$Site)]
 
+#add Na:Zr and Ca:Zr ratios
+tot_elem_df$Na2O_Zr <- tot_elem_df$Na2O / tot_elem_df$Zr
+summary(tot_elem_df$Na2O_Zr)
+tot_elem_df$CaO_Zr <- tot_elem_df$CaO / tot_elem_df$Zr
+summary(tot_elem_df$CaO_Zr)
+
 aggregate_andsome <- function(x, y) {
   result <- aggregate(y[[x]] ~ y[['Site']], FUN = mean, na.rm = TRUE)
   colnames(result) <- c('Site', x)
@@ -64,6 +70,15 @@ plot(fe_means$Depth, fe_means$Fe2O3)
 text(fe_means$Depth, fe_means$Fe2O3, fe_means$Site)
 fe_means <- fe_means[fe_means$Site != 'SR.A.51' & fe_means$Site != 'SR.A.55', ]
 
+na_zr_means <- aggregate_andsome('Na2O_Zr', tot_elem_df)
+plot(na_zr_means$Depth, na_zr_means$Na2O_Zr)
+text(na_zr_means$Depth, na_zr_means$Na2O_Zr, na_zr_means$Site)
+
+ca_zr_means <- aggregate_andsome('CaO_Zr', tot_elem_df)
+plot(ca_zr_means$Depth, ca_zr_means$CaO_Zr)
+text(ca_zr_means$Depth, ca_zr_means$CaO_Zr, ca_zr_means$Site) #SR.A.51  and SR.A.55 are outliers
+ca_zr_means <- ca_zr_means[ca_zr_means$Site != 'SR.A.51' & ca_zr_means$Site != 'SR.A.55', ]
+
 elem_by_site <- data.frame(Site=ca_means$Site, Depth=ca_means$Depth, CaO=ca_means$CaO, MgO=mg_means$MgO, K2O=k_means$K2O, Na2O=na_means$Na2O, Al2O3=al_means$Al2O3, SiO2=si_means$SiO2)
 
 
@@ -86,3 +101,5 @@ plot_the_vioplot('Na2O_vioplots.tif', na_means, 'Na2O', expression('Na'[2]*'O (%
 plot_the_vioplot('Al2O3_vioplots.tif', al_means, 'Al2O3', expression('Al'[2]*'O'[3]~'(%)'))
 plot_the_vioplot('Fe2O3_vioplots.tif', fe_means, 'Fe2O3', expression('Fe'[2]*'O'[3]~'(%)'))
 plot_the_vioplot('SiO2_vioplots.tif', si_means, 'SiO2', expression('SiO'[2]~'(%)'))
+plot_the_vioplot('Na_Zr_vioplots.tif', na_zr_means, 'Na2O_Zr', expression('Na'[2]*'O:Zr'))
+plot_the_vioplot('CaO_Zr_vioplots.tif', ca_zr_means, 'CaO_Zr', 'CaO:Zr')
