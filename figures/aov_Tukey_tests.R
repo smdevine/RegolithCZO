@@ -25,7 +25,7 @@ welch.test(TWI_N ~ depth_class, data = soaproot_pts_analysis) #Welch's Heterosce
 aov_twi <- aov(TWI_N ~ depth_class, data = soaproot_pts_analysis)
 oneway(y=soaproot_pts_analysis$TWI_N, x=soaproot_pts_analysis$depth_class, posthoc = 'games-howell') #3 vs. 1 significant (p=0.02); 2 vs. 1 notable (p=0.06)
 #summary(aov_twi) #p=0.003
-#TukeyHSD(aov_twi)
+TukeyHSD(aov_twi)
 
 #stream distance
 qqPlot(soaproot_pts_analysis$str_dist_N[soaproot_pts_analysis$depth_class==1]) #ok
