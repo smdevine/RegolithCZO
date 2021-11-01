@@ -1,11 +1,13 @@
 dataDir <- 'C:/Users/smdevine/Desktop/post doc/czo work'
 FiguresDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/results/figures'
+DataFitDir <- 'C:/Users/smdevine/Desktop/post doc/czo work/fit data distribution'
 library(extrafont)
 library(extrafontdb)
 #font_import() only needs to be done once
 loadfonts()
 res_plots <- 800
 gray_colors <- gray.colors(n=4, start = 0.05, end = 0.75)
+gray_colors <- c(gray_colors[c(1:2,4)], '#FFFFFF') #make more distinguishable
 error.bar <- function(x, y, upper, lower=upper, length=0.1,...){
   if(length(x) != length(y) | length(y) !=length(lower) | length(lower) != length(upper))
     stop("vectors must be same length")
@@ -41,31 +43,36 @@ synthetic_7.56m_gamma <- function(shape, scale) {
   }
   return(x)
 }
+synthetic_7.56m_gamma(shape = 1.915, scale = 1/0.273)
+
+#read-in data
 df_master <- read.csv(file.path(dataDir, 'Master Data Set_with rock outcrop.csv'), stringsAsFactors = FALSE) #removed biological data from this dataset but it has duplicate rows where multiple biological observations were made at each point; also removed 0's from outcrop (OC) site codes 01-09 to match points dataset labeling
 df_sites <- df_master[match(unique(df_master$Site), df_master$Site),]
 depths <- df_sites$Depth[df_sites$Depth != 0 & !is.na(df_sites$Depth)]
 
+#read-in fitted paramters
+fitted_params <- read.csv(file.path(DataFitDir, 'fitted_parameters.csv'), stringsAsFactors = FALSE)
+fitted_params
 
-synthetic_7.56m_gamma(shape = 1.915, scale = 1/0.273)
-
-
-#do.call(cbind, 
-gamma_dist <- replicate(10000, sapply(depths, function(y) {if (y == 7.56) {synthetic_7.56m_gamma(shape = 1.915, scale = 1/0.273)} else{y}}))
-log_dist <- replicate(10000, sapply(depths, function(y) {if (y == 7.56) {synthetic_7.56m_log(meanlog=1.773, sdlog=0.904)} else{y}}))
-norm_dist <- replicate(10000, sapply(depths, function(y) {if (y == 7.56) {synthetic_7.56m_norm(mean_sample = 5.591, sd_sample = 2.581)} else{y}}))
+gamma_dist <- replicate(10000, sapply(depths, function(y) {if (y == 7.56) {synthetic_7.56m_gamma(shape = fitted_params$value[fitted_params$parameter=='gamma_shape'], scale = 1/fitted_params$value[fitted_params$parameter=='gamma_scale'])} else{y}}))
+log_dist <- replicate(10000, sapply(depths, function(y) {if (y == 7.56) {synthetic_7.56m_log(meanlog=fitted_params$value[fitted_params$parameter=='log_mean'], sdlog=fitted_params$value[fitted_params$parameter=='log_sd'])} else{y}}))
+norm_dist <- replicate(10000, sapply(depths, function(y) {if (y == 7.56) {synthetic_7.56m_norm(mean_sample = fitted_params$value[fitted_params$parameter=='norm_mean'], sd_sample = fitted_params$value[fitted_params$parameter=='norm_sd'])} else{y}}))
 
 #entirely synthetic approach
-gamma_dist_syn <- replicate(10000, rgamma(66, shape = 1.915, scale = 1/0.273))
+gamma_dist_syn <- replicate(10000, rgamma(66, shape = fitted_params$value[fitted_params$parameter=='gamma_shape'], scale = 1/fitted_params$value[fitted_params$parameter=='gamma_scale']))
 gamma_dist_syn <- as.data.frame(gamma_dist_syn)
-log_dist_syn <- replicate(10000, rlnorm(66, meanlog=1.773, sdlog=0.904))
+log_dist_syn <- replicate(10000, rlnorm(66, meanlog=fitted_params$value[fitted_params$parameter=='log_mean'], sdlog=fitted_params$value[fitted_params$parameter=='log_sd']))
 log_dist_syn <- as.data.frame(log_dist_syn)
-norm_dist_syn <- replicate(10000, rnorm(66, mean = 5.591, sd = 2.581))
+norm_dist_syn <- replicate(10000, rnorm(66, mean = fitted_params$value[fitted_params$parameter=='norm_mean'], sd = fitted_params$value[fitted_params$parameter=='norm_sd']))
 norm_dist_syn <- as.data.frame(norm_dist_syn)
 
 mean(sapply(gamma_dist_syn, function(x) quantile(x, 0.9))) #13.55043 for gamma
 mean(sapply(log_dist_syn, function(x) quantile(x, 0.9))) #18.41627 for lognormal
-mean(sapply(norm_dist_syn, function(x) quantile(x, 0.9))) #8.795558 for norm
+mean(sapply(norm_dist_syn, function(x) quantile(x, 0.9))) #8.553835 for norm
 
+mean(sapply(gamma_dist_syn, function(x) quantile(x, 0.59))) #6.94454 for gamma
+mean(sapply(log_dist_syn, function(x) quantile(x, 0.59))) #7.282151 for lognormal
+mean(sapply(norm_dist_syn, function(x) quantile(x, 0.59))) #5.979425
 
 result_gamma_syn <- data.frame(less_than_2.5=sapply(gamma_dist_syn, function(x) sum(x < 2.5)), from_2.5_to_5=sapply(gamma_dist_syn, function(x) sum(x >= 2.5 & x < 5)), from_5_to_7.5=sapply(gamma_dist_syn, function(x) sum(x >= 5 & x < 7.5)), from_7.5_to_10=sapply(gamma_dist_syn, function(x) sum(x >= 7.5 & x < 10)), from_10_to_12.5=sapply(gamma_dist_syn, function(x) sum(x >= 10 & x < 12.5)), from_12.5_to_15=sapply(gamma_dist_syn, function(x) sum(x >= 12.5 & x < 15)), great_than_15=sapply(gamma_dist_syn, function(x) sum(x >= 15)))
 
@@ -81,19 +88,19 @@ barplot_matrix <- 100 * rbind(result_act_syn, sapply(result_gamma_syn, mean), sa
 barplot_sds <-rbind(rep(NA, 7), sapply(result_gamma_syn, sd), sapply(result_log_syn, sd), sapply(result_norm_syn, sd))
 barplot_CI99 <- 3.291 * barplot_sds / sqrt(10000) #
 
-tiff(file = file.path(FiguresDir, 'hist_data_distributions.tif'), family = 'Times New Roman', pointsize = 11, width = 6.5, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
+tiff(file = file.path(FiguresDir, 'hist_data_distributions_revised_v2.tif'), family = 'Times New Roman', pointsize = 11, width = 6.5, height = 3.5, units = 'in', res=res_plots, compression = 'lzw')
 par(mar=c(3.75, 4.5, 0.5, 0.5))
 bar_stats <- barplot(height = barplot_matrix, space = c(0,0.5), xaxt = 'n', xlab='', ylab='Soaproot watershed area (%)', beside=TRUE, axes=TRUE, col = gray_colors) #make a matrix where each row represents different distribution
 mtext(text = c('<2.5', '2.5-5', '5-7.5', '7.5-10', '10-12.5', '12.5-15', '>15'), side = 1, line = 0.75, at = c(2.5, 7, 11.5, 16.5, 21, 25.5, 30))
 mtext(text = 'Depth classes (m)', side = 1, line = 2.5, at = 16.5)
-lines(x=c(15, 15), y=c(15, 20), lty=2)
-arrows(x0=15, y0=17.5, x1=17, length = 0.05)
-text(x=17.5, y=18.5, labels='41% of locations sampled had', adj=c(0,0))
-text(x=17.5, y=15.5, labels='indeterminable depth > 7.56 m', adj=c(0,0))
+lines(x=c(15, 15), y=c(15, 24), lty=2)
+arrows(x0=15, y0=19.5, x1=18.5, length = 0.05)
+text(x=19, y=20.5, labels='41% of locations sampled had', adj=c(0,0.5))
+text(x=19, y=18.5, labels='indeterminable depth > 7.5 m', adj=c(0,0.5))
 legend_colors <- gray_colors
 legend_colors <- c(legend_colors[1], NA, legend_colors[2:4])
-legend(x = 23, y=39, legend = c('actual samples', '', 'gamma', 'lognormal', 'normal'), pch=c(22,NA,rep(22, 3)), pt.bg=legend_colors)
-text(23.4, y=32.8, 'fitted distributions', adj=c(0,0))
+legend('topright', legend = c('actual samples', '', 'gamma', 'lognormal', 'normal'), pch=c(22,NA,rep(22, 3)), pt.bg=legend_colors)
+text(25.5, y=31.1, 'fitted distributions', adj=c(0,0.5))
 #error.bar(bar_stats, barplot_matrix,  barplot_CI99)
 dev.off()
 
